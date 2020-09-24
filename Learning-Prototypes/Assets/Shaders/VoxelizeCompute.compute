@@ -1,0 +1,78 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSMain
+
+typedef uint triangle_ptr;
+typedef uint node_ptr;
+#define nullptr 0
+
+struct TreeNode
+{
+    float3 origin;
+    float extends;
+    triangle_ptr triangles[4];
+    node_ptr children[8];
+};
+
+struct tripoly
+{
+    float3 v[3];
+};
+
+AppendStructuredBuffer<TreeNode> octree;
+StructuredBuffer<uint> triangleIndeces;
+StructuredBuffer<tripoly> triangles;
+uint resolution;
+float voxelSize;
+uint triangleCount;
+
+[numthreads(1024, 1, 1)]
+void CSMain(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
+{
+    uint idx = id.x + (1024 * groupId.x);
+    
+    if (idx >= (resolution * resolution * resolution))
+        return;
+    
+    uint3 idx3 = uint3(idx % resolution, idx / (resolution * resolution), (idx / resolution) % resolution);
+    
+    float boundSize = voxelSize;
+    float extends = boundSize * 0.5f;
+    float3 origin = (float3(idx3.x, idx3.y, idx3.z) * float3(boundSize, boundSize, boundSize)) + float3(extends, extends, extends);
+    
+    uint maxGenerationCount = uint((log((float) triangleCount) / log(8.f)) * 3.f); // Technically it should be infinity but we don't want that, so we call it 3x the minimal generation count.
+
+    for (uint generation = 0; generation < maxGenerationCount; generation++)
+    {
+        TreeNode node;
+        node.origin = origin;
+        node.extends = extends;
+
+        {        
+            for (int i = 0; i < 4; i++)
+                node.triangles[i] = nullptr;
+        }
+        
+        {
+            for (int i = 0; i < 8; i++)
+                node.children[i] = nullptr;
+        }
+        
+        uint3 cull;
+        cull.x = idx3.x % (uint)(floor(pow(2, generation)));
+        cull.y = idx3.y % (uint)(floor(pow(2, generation)));
+        cull.z = idx3.z % (uint)(floor(pow(2, generation)));
+        
+        if (cull.x != 0 || cull.y != 0 || cull.z != 0)
+        {
+            return;
+        }
+        
+        octree.Append(node);
+        
+        if (extends * 2.f >= resolution * voxelSize)
+            return;
+        
+        extends *= 2.f;
+        origin = (float3(idx3.x, idx3.y, idx3.z) * float3(boundSize, boundSize, boundSize)) + float3(extends, extends, extends);
+    }
+}

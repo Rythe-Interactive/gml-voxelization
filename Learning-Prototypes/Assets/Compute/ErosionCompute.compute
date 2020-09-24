@@ -1,0 +1,123 @@
+﻿#pragma kernel CSErosion
+
+RWTexture2D<float4> heightMap;
+StructuredBuffer<int2> randomIndices;
+StructuredBuffer<int2> brushIndices;
+StructuredBuffer<float> brushWeights;
+
+int resolution;
+int brushLength;
+int borderSize;
+
+int maxLifetime;
+float inertia;
+float sedimentCapacityFactor;
+float minSedimentCapacity;
+float depositSpeed;
+float erodeSpeed;
+
+float waterHeight;
+float waterDampening;
+
+float evaporateSpeed;
+float gravity;
+float startSpeed;
+float startWater;
+
+float3 CalculateHeightAndGradient(float2 position)
+{
+    int2 index = int2((int) position.x, (int) position.y);
+
+    float2 offset = float2(position.x - index.x, position.y - index.y);
+
+    float heightNW = heightMap[index].r;
+    float heightNE = heightMap[index + int2(0, 1)].r;
+    float heightSW = heightMap[index + int2(1, 0)].r;
+    float heightSE = heightMap[index + int2(1, 1)].r;
+
+    float2 gradient;
+    gradient.x = (heightSW - heightNW) * (1 - offset.x) + (heightSE - heightNE) * offset.x;
+    gradient.y = (heightNE - heightNW) * (1 - offset.y) + (heightSE - heightSW) * offset.y;
+
+    float height = heightNW * (1 - offset.x) * (1 - offset.y) + heightNE * offset.x * (1 - offset.y) + heightSW * (1 - offset.x) * offset.y + heightSE * offset.x * offset.y;
+
+    return float3(gradient, height);
+}
+
+[numthreads(1024, 1, 1)]
+void CSErosion(uint3 id : SV_DispatchThreadID)
+{
+    int2 pixelIndex = randomIndices[id.x];
+    float2 position = float2(pixelIndex.x + 0.5, pixelIndex.y + 0.5);
+    float2 direction = float2(0, 0);
+    float speed = startSpeed;
+    float water = startWater;
+    float sediment = 0;
+
+    for (int lifetime = 0; lifetime < maxLifetime; lifetime++)
+    {
+        pixelIndex = int2((int) position.x, (int) position.y);
+
+        float2 dropletOffset = float2(position.x - pixelIndex.x, position.y - pixelIndex.y);
+
+        float3 heightAndGradient = CalculateHeightAndGradient(position);
+
+        direction.x = (direction.x * inertia - heightAndGradient.x * (1 - inertia));
+        direction.y = (direction.y * inertia - heightAndGradient.y * (1 - inertia));
+
+        float dirLen = length(direction);
+        if (dirLen == 0)
+            break;
+
+        direction /= dirLen;
+        direction *= 0.5;
+        position += direction;
+
+        if (position.x < 0 || position.x > resolution - 1 || position.y < 0 || position.y > resolution - 1)
+            break;
+
+        float newHeight = CalculateHeightAndGradient(position).z;
+        float deltaHeight = newHeight - heightAndGradient.z;
+
+        float sedimentCapacity = max(-deltaHeight * speed * water * sedimentCapacityFactor, minSedimentCapacity);
+
+        if (sediment > sedimentCapacity || deltaHeight >= 0 || heightAndGradient.z < waterHeight)
+        {
+            //heightMap[pixelIndex] += float4(0, 1, 0, 0);
+            float amountToDeposit = max((deltaHeight >= 0) ? min(deltaHeight, sediment * depositSpeed) : (sediment - sedimentCapacity) * depositSpeed, 0);
+            sediment -= amountToDeposit;
+
+            heightMap[pixelIndex] += float4(amountToDeposit * (1 - dropletOffset.x) * (1 - dropletOffset.y), 0, 0, 0);
+            heightMap[pixelIndex + int2(1, 0)] += float4(amountToDeposit * dropletOffset.x * (1 - dropletOffset.y), 0, 0, 0);
+            heightMap[pixelIndex + int2(0, 1)] += float4(amountToDeposit * (1 - dropletOffset.x) * dropletOffset.y, 0, 0, 0);
+            heightMap[pixelIndex + int2(1, 1)] += float4(amountToDeposit * dropletOffset.x * dropletOffset.y, 0, 0, 0);
+        }
+        else
+        {
+            //heightMap[pixelIndex] += float4(0, 0, 1, 0);
+            float amountToErode = max(min((sedimentCapacity - sediment) * erodeSpeed, -deltaHeight), 0);
+
+            for (int i = 0; i < brushLength; i++)
+            {
+                int2 erodeIndex = pixelIndex + brushIndices[i];
+
+                float weightedErodeAmount = amountToErode * brushWeights[i];
+                float deltaSediment = (heightMap[erodeIndex].r < weightedErodeAmount) ? heightMap[erodeIndex].r : weightedErodeAmount;
+                heightMap[erodeIndex] -= float4(deltaSediment, 0, 0, 0);
+
+                sediment += deltaSediment;
+            }
+        }
+
+        if (heightAndGradient.z > waterHeight)
+        {
+            speed = sqrt(max(0, speed * speed + deltaHeight * gravity));
+            water *= (1 - evaporateSpeed);
+        }
+        else
+        {
+            speed = max(0, speed);
+            speed *= 1.0-waterDampening;
+        }
+    }
+}

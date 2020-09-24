@@ -1,0 +1,32 @@
+﻿// Each #kernel tells which function to compile; you can have many kernels
+#pragma kernel CSTerrain
+
+RWTexture2D<float4> heightMap;
+RWStructuredBuffer<float2> randomOffsets;
+int layers;
+float persistence;
+float baseRoughness;
+float roughness;
+int resolution;
+
+#include "Assets/Resources/Compute/SimplexNoise.compute"
+
+[numthreads(32, 32, 1)]
+void CSTerrain(uint3 id : SV_DispatchThreadID)
+{
+    float weight = 1;
+    float combinedWeight = 0;
+    float scale = baseRoughness;
+
+    float4 color = float4(0, 0, 0, 0);
+
+    for (int i = 0; i < layers; i++)
+    {
+        color.r += snoise(id.xy / ((float) resolution) * scale + randomOffsets[i]) * weight;
+        combinedWeight += weight;
+        weight *= persistence;
+        scale *= roughness;
+    }
+
+    heightMap[id.xy] = color / combinedWeight;
+}

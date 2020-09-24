@@ -1,0 +1,46 @@
+﻿#pragma kernel CSCityLayout
+
+RWTexture2D<float4> heightMap;
+
+float probabilityScale;
+int resolution;
+int evaluationRadius;
+float probabilityPower;
+int2 cityCenter;
+float cityRadius;
+float outSkirtMultiplyer;
+
+float waterHeight;
+
+[numthreads(32, 32, 1)]
+void CSCityLayout(uint3 id : SV_DispatchThreadID)
+{
+    float currentHeight = max(0, min(1, heightMap[id.xy].r));
+
+    float probability = 0;
+
+    if (currentHeight > waterHeight)
+    {
+        int pointCount = 0;
+        for (int x = -evaluationRadius; x < evaluationRadius; x++)
+        {
+            int maxY = evaluationRadius * sin(acos(x / evaluationRadius));
+            for (int y = -maxY; y <= maxY; y++)
+            {
+                probability += (1 - (max(0, min(1, heightMap[id.xy + int2(x, y)].r)) - waterHeight)) * probabilityScale;
+                pointCount++;
+            }
+        }
+        probability /= pointCount;
+        probability = pow(abs(probability), probabilityPower);
+
+        if (abs(length((float2) id.xy - (float2) cityCenter)) > cityRadius)
+            probability *= outSkirtMultiplyer;
+
+    }
+
+    float4 color = heightMap[id.xy];
+    AllMemoryBarrierWithGroupSync();
+    heightMap[id.xy] = float4(color.r, probability, color.b, color.a);
+
+}
