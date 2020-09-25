@@ -177,6 +177,7 @@ void CSMain(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
 
     uint nodesInGeneration = resolution * resolution * resolution;
     uint generationResolution = resolution;
+    uint childrenResolution = resolution;
     uint totalNodes = 0;
     uint generationalIdx = idx;
     uint3 generationIdx3 = idx3;
@@ -193,28 +194,24 @@ void CSMain(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
         {
             for (int i = 0; i < 4; i++)
                 node.triangles[i] = triangleIndices[i];
-        }
-        else
-        {
-            for (int i = 0; i < 4; i++)
-                node.triangles[i] = nullptr;
-        }
-
-        if (generation == 0)
-        {
+            
             for (int i = 0; i < 4; i++)
                 node.children[i] = nullptr;
         }
         else
         {
+            for (int i = 0; i < 4; i++)
+                node.triangles[i] = nullptr;
+            
+            childIdx3 = IdxToIdx3(childIdx, childrenResolution);
             node.children[0] = hierarchy[childIdx]; // 0, 0, 0
-            node.children[1] = hierarchy[Idx3ToIdx(childIdx3 + uint3(1, 0, 0), generationResolution)]; // 1, 0, 0
-            node.children[2] = hierarchy[Idx3ToIdx(childIdx3 + uint3(1, 0, 1), generationResolution)]; // 1, 0, 1
-            node.children[3] = hierarchy[Idx3ToIdx(childIdx3 + uint3(0, 0, 1), generationResolution)]; // 0, 0, 1
-            node.children[4] = hierarchy[Idx3ToIdx(childIdx3 + uint3(0, 1, 0), generationResolution)]; // 0, 1, 0
-            node.children[5] = hierarchy[Idx3ToIdx(childIdx3 + uint3(1, 1, 0), generationResolution)]; // 1, 1, 0
-            node.children[6] = hierarchy[Idx3ToIdx(childIdx3 + uint3(1, 1, 1), generationResolution)]; // 1, 1, 1
-            node.children[7] = hierarchy[Idx3ToIdx(childIdx3 + uint3(0, 1, 1), generationResolution)]; // 0, 1, 1
+            node.children[1] = hierarchy[Idx3ToIdx(childIdx3 + uint3(1, 0, 0), childrenResolution)]; // 1, 0, 0
+            node.children[2] = hierarchy[Idx3ToIdx(childIdx3 + uint3(1, 0, 1), childrenResolution)]; // 1, 0, 1
+            node.children[3] = hierarchy[Idx3ToIdx(childIdx3 + uint3(0, 0, 1), childrenResolution)]; // 0, 0, 1
+            node.children[4] = hierarchy[Idx3ToIdx(childIdx3 + uint3(0, 1, 0), childrenResolution)]; // 0, 1, 0
+            node.children[5] = hierarchy[Idx3ToIdx(childIdx3 + uint3(1, 1, 0), childrenResolution)]; // 1, 1, 0
+            node.children[6] = hierarchy[Idx3ToIdx(childIdx3 + uint3(1, 1, 1), childrenResolution)]; // 1, 1, 1
+            node.children[7] = hierarchy[Idx3ToIdx(childIdx3 + uint3(0, 1, 1), childrenResolution)]; // 0, 1, 1
         }
 
         uint3 subIdx3;
@@ -250,6 +247,7 @@ void CSMain(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
         childIdx = generationalIdx;
         totalNodes += nodesInGeneration;
         nodesInGeneration /= 8;
+        childrenResolution = generationResolution;
         generationResolution /= 2;
         generationalIdx = totalNodes;
         childIdx3 = generationIdx3;

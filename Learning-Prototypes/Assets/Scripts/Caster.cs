@@ -5,21 +5,31 @@ using UnityEngine;
 public class Caster : MonoBehaviour
 {
     public Voxelizer voxelizer;
+    public Transform transformer;
     public bool draw;
-
+    public bool bruteForce;
     private void OnDrawGizmos()
     {
-        if(!draw)
+        if (!draw)
             return;
 
-        if(voxelizer == null || voxelizer.data == null)
+        if (voxelizer == null || voxelizer.data == null)
             return;
+
+        Vector3 origin = transform.position;
+        Vector3 direction = transform.forward;
+
+        Gizmos.color = Color.white;
+        Gizmos.DrawLine(origin, origin + (direction * 100000000));
+
+        Gizmos.matrix = transformer.localToWorldMatrix;
 
         voxelizer.OnDrawGizmos();
 
-        Ray ray = new Ray(transform.position, transform.forward);
-        Gizmos.color = Color.white;
-        Gizmos.DrawLine(ray.origin, ray.origin + (ray.direction * 100000000));
+        origin = transformer.worldToLocalMatrix * new Vector4(origin.x, origin.y, origin.z, 1);
+        direction = transformer.worldToLocalMatrix * new Vector4(direction.x, direction.y, direction.z, 0);
+
+        Ray ray = new Ray(origin, direction);
 
         Voxelizer.TreeNode root = voxelizer.data[voxelizer.root];
 
@@ -34,10 +44,13 @@ public class Caster : MonoBehaviour
 
         Gizmos.color = Color.red;
 
-        for(int i = 0; i < voxelizer.data.Length; i++)
-            TraverseTree(voxelizer.data[i], ray);
-
-        //TraverseTree(root, ray);
+        if (bruteForce)
+        {
+            for (int i = 0; i < voxelizer.data.Length; i++)
+                TraverseTree(voxelizer.data[i], ray);
+        }
+        else
+            TraverseTree(root, ray);
     }
 
     void TraverseTree(Voxelizer.TreeNode node, Ray ray)
@@ -46,24 +59,27 @@ public class Caster : MonoBehaviour
         Bounds box = new Bounds(node.origin, extends);
         if (box.IntersectRay(ray))
         {
-            Gizmos.DrawWireCube(node.origin, extends * 2f);            
+            Gizmos.DrawWireCube(node.origin, extends * 2f);
         }
 
-        //if (node.child0 != 0)
-        //    TraverseTree(voxelizer.data[node.child0 - 1], ray);
-        //if (node.child1 != 0)
-        //    TraverseTree(voxelizer.data[node.child1 - 1], ray);
-        //if (node.child2 != 0)
-        //    TraverseTree(voxelizer.data[node.child2 - 1], ray);
-        //if (node.child3 != 0)
-        //    TraverseTree(voxelizer.data[node.child3 - 1], ray);
-        //if (node.child4 != 0)
-        //    TraverseTree(voxelizer.data[node.child4 - 1], ray);
-        //if (node.child5 != 0)
-        //    TraverseTree(voxelizer.data[node.child5 - 1], ray);
-        //if (node.child6 != 0)
-        //    TraverseTree(voxelizer.data[node.child6 - 1], ray);
-        //if (node.child7 != 0)
-        //    TraverseTree(voxelizer.data[node.child7 - 1], ray);
+        if (!bruteForce)
+        {
+            if (node.child0 != 0)
+                TraverseTree(voxelizer.data[node.child0 - 1], ray);
+            if (node.child1 != 0)
+                TraverseTree(voxelizer.data[node.child1 - 1], ray);
+            if (node.child2 != 0)
+                TraverseTree(voxelizer.data[node.child2 - 1], ray);
+            if (node.child3 != 0)
+                TraverseTree(voxelizer.data[node.child3 - 1], ray);
+            if (node.child4 != 0)
+                TraverseTree(voxelizer.data[node.child4 - 1], ray);
+            if (node.child5 != 0)
+                TraverseTree(voxelizer.data[node.child5 - 1], ray);
+            if (node.child6 != 0)
+                TraverseTree(voxelizer.data[node.child6 - 1], ray);
+            if (node.child7 != 0)
+                TraverseTree(voxelizer.data[node.child7 - 1], ray);
+        }
     }
 }
