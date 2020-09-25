@@ -10,8 +10,12 @@ public class Voxelizer : MonoBehaviour
 {
     public ComputeShader voxelizeShader;
     public uint resolution;
+    public bool drawTriangles;
+    public bool drawNodes;
+    public bool drawLeavesOnly;
+    public bool draw0thChild;
 
-    struct tripoly
+    public struct tripoly
     {
         public Vector3 v0;
         public Vector3 v1;
@@ -25,7 +29,7 @@ public class Voxelizer : MonoBehaviour
         }
     }
 
-    struct TreeNode
+    public struct TreeNode
     {
         public Vector3 origin;
         public float extends;
@@ -44,11 +48,16 @@ public class Voxelizer : MonoBehaviour
     };
 
     Mesh model;
-    TreeNode[] data;
+    [HideInInspector]
+    public TreeNode[] data;
+    [HideInInspector]
+    public uint root;
     int nodeCount;
     float maxExtend;
-    List<tripoly> triangles = new List<tripoly>();
-    int generationCount = 0;
+    [HideInInspector]
+    public List<tripoly> triangles = new List<tripoly>();
+    [HideInInspector]
+    public int generationCount = 0;
 
     uint maxNodes(uint generation)
     {
@@ -90,7 +99,7 @@ public class Voxelizer : MonoBehaviour
         maxExtend = Mathf.Max(model.bounds.extents.x, model.bounds.extents.y, model.bounds.extents.z);
         float voxelSize = (maxExtend * 2f) / resolution;
 
-        uint maxVoxelCount = (resolution+1) * (resolution + 1) * (resolution + 1);
+        uint maxVoxelCount = (resolution + 1) * (resolution + 1) * (resolution + 1);
 
         Debug.Log("voxel size: " + voxelSize + ", max size: " + (maxExtend * 2f) + ", max voxel count: " + maxVoxelCount);
 
@@ -162,9 +171,12 @@ public class Voxelizer : MonoBehaviour
         octree.GetData(data);
     }
 
-    void OnDrawGizmos()
+    public void OnDrawGizmos()
     {
         int oldGenerationCount = generationCount;
+        float biggestSize = 0;
+        root = 0;
+
         if (data != null)
         {
             int generation = -1;
@@ -186,85 +198,110 @@ public class Voxelizer : MonoBehaviour
                     hasTriangle = true;
                     int idx = (int)data[i].triangle0 - 1;
 
-                    if (idx >= triangles.Count)
-                    {
-                        Debug.Log(idx);
-                        data[i].triangle0 = 0;
-                    }
-                    else
-                    {
-                        tripoly triangle = triangles[idx];
-                        Gizmos.DrawLine(triangle.v0, triangle.v1);
-                        Gizmos.DrawLine(triangle.v1, triangle.v2);
-                        Gizmos.DrawLine(triangle.v2, triangle.v0);
-                    }
+                    if (drawTriangles)
+                        if (idx >= triangles.Count)
+                        {
+                            Debug.Log(idx);
+                            data[i].triangle0 = 0;
+                        }
+                        else
+                        {
+                            tripoly triangle = triangles[idx];
+                            Gizmos.DrawLine(triangle.v0, triangle.v1);
+                            Gizmos.DrawLine(triangle.v1, triangle.v2);
+                            Gizmos.DrawLine(triangle.v2, triangle.v0);
+                        }
                 }
                 if (data[i].triangle1 != 0)
                 {
                     hasTriangle = true;
                     int idx = (int)data[i].triangle1 - 1;
 
-                    if (idx >= triangles.Count)
-                    {
-                        Debug.Log(idx);
-                        data[i].triangle1 = 0;
-                    }
-                    else
-                    {
-                        tripoly triangle = triangles[idx];
-                        Gizmos.DrawLine(triangle.v0, triangle.v1);
-                        Gizmos.DrawLine(triangle.v1, triangle.v2);
-                        Gizmos.DrawLine(triangle.v2, triangle.v0);
-                    }
+                    if (drawTriangles)
+                        if (idx >= triangles.Count)
+                        {
+                            Debug.Log(idx);
+                            data[i].triangle1 = 0;
+                        }
+                        else
+                        {
+                            tripoly triangle = triangles[idx];
+                            Gizmos.DrawLine(triangle.v0, triangle.v1);
+                            Gizmos.DrawLine(triangle.v1, triangle.v2);
+                            Gizmos.DrawLine(triangle.v2, triangle.v0);
+                        }
                 }
                 if (data[i].triangle2 != 0)
                 {
                     hasTriangle = true;
                     int idx = (int)data[i].triangle2 - 1;
 
-                    if (idx >= triangles.Count)
-                    {
-                        Debug.Log(idx);
-                        data[i].triangle2 = 0;
-                    }
-                    else
-                    {
-                        tripoly triangle = triangles[idx];
-                        Gizmos.DrawLine(triangle.v0, triangle.v1);
-                        Gizmos.DrawLine(triangle.v1, triangle.v2);
-                        Gizmos.DrawLine(triangle.v2, triangle.v0);
-                    }
+                    if (drawTriangles)
+                        if (idx >= triangles.Count)
+                        {
+                            Debug.Log(idx);
+                            data[i].triangle2 = 0;
+                        }
+                        else
+                        {
+                            tripoly triangle = triangles[idx];
+                            Gizmos.DrawLine(triangle.v0, triangle.v1);
+                            Gizmos.DrawLine(triangle.v1, triangle.v2);
+                            Gizmos.DrawLine(triangle.v2, triangle.v0);
+                        }
                 }
                 if (data[i].triangle3 != 0)
                 {
                     hasTriangle = true;
                     int idx = (int)data[i].triangle3 - 1;
 
-                    if (idx >= triangles.Count)
-                    {
-                        Debug.Log(idx);
-                        data[i].triangle3 = 0;
-                    }
-                    else
-                    {
-                        tripoly triangle = triangles[idx];
-                        Gizmos.DrawLine(triangle.v0, triangle.v1);
-                        Gizmos.DrawLine(triangle.v1, triangle.v2);
-                        Gizmos.DrawLine(triangle.v2, triangle.v0);
-                    }
+                    if (drawTriangles)
+                        if (idx >= triangles.Count)
+                        {
+                            Debug.Log(idx);
+                            data[i].triangle3 = 0;
+                        }
+                        else
+                        {
+                            tripoly triangle = triangles[idx];
+                            Gizmos.DrawLine(triangle.v0, triangle.v1);
+                            Gizmos.DrawLine(triangle.v1, triangle.v2);
+                            Gizmos.DrawLine(triangle.v2, triangle.v0);
+                        }
                 }
 
                 if (hasTriangle)
                     Gizmos.color = Color.yellow;
-                else
+                else if (!drawLeavesOnly)
                     Gizmos.color = Color.blue;
-                //continue;
+                else
+                    continue;
 
-                Gizmos.DrawWireCube(data[i].origin, new Vector3(data[i].extends, data[i].extends, data[i].extends) * 2f);
+                if (biggestSize < data[i].extends)
+                {
+                    biggestSize = data[i].extends;
+                    root = (uint)i;
+                }
+
+                if (drawNodes)
+                    Gizmos.DrawWireCube(data[i].origin, new Vector3(data[i].extends, data[i].extends, data[i].extends) * 2f);
             }
+
+            if (draw0thChild)
+                    Draw0thChildBranch(data[root]);
         }
 
         if (generationCount != oldGenerationCount)
             Debug.Log("generated " + (generationCount + 1) + " generations");
+    }
+
+    void Draw0thChildBranch(TreeNode node)
+    {
+        Gizmos.DrawWireCube(node.origin, new Vector3(node.extends, node.extends, node.extends) * 2f);
+
+        if (node.child0 != 0)
+        {
+            Draw0thChildBranch(data[node.child0 - 1]);
+        }
     }
 }

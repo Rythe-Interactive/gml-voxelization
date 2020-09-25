@@ -16,6 +16,17 @@ public class VoxelizerEditor : Editor
             SceneView.RepaintAll();
         }
 
+        if (GUILayout.Button("Clear"))
+        {
+            Voxelizer vox = (target as Voxelizer);
+            vox.ClearLog();
+            vox.generationCount = 0;
+            vox.triangles.Clear();
+            vox.data = null;
+
+            SceneView.RepaintAll();
+        }
+
         rotationSpeed = EditorGUILayout.FloatField("Rotation Speed", rotationSpeed);
 
         bool newRotate = GUILayout.Toggle(rotate, "Rotate");
