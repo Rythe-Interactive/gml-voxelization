@@ -3,7 +3,8 @@
 	Properties
 	{
 		_LineColor("Line color", Color) = (1.0, 1.0, 1.0, 1.0)
-		_LineWidth("Line Width", Range(0.1, 10.0)) = 1.0
+		_LineWidth("Line width", Range(0.1, 10.0)) = 1.0
+		_DrawFaces("Draw faces", Range(0, 1)) = 1
 	}
 
 		SubShader
@@ -51,6 +52,7 @@
 			CBUFFER_START(UnityPerMaterial)
 			float4 _LineColor;
 			float _LineWidth;
+			int _DrawFaces;
 			CBUFFER_END
 
 			v2f vert(appdata v)
@@ -99,7 +101,12 @@
 				fixed4 col;
 
 				if (minBary / i.vertex.z > 0.1)
+				{
+					if (!_DrawFaces)
+						discard;
+
 					col = fixed4(normalize(i.normal + half3(0.5, 0.5, 0.5)), 1.0);
+				}
 				else
 					col = fixed4(_LineColor.rgb, 1.0);
 

@@ -1,0 +1,272 @@
+﻿struct tripoly
+{
+	float3 v[3];
+};
+
+#define INSIDE 0
+#define OUTSIDE 1
+
+#define EPS 10e-5
+#define SIGN3( A ) \
+	  (((A).x < EPS) ? 4 : 0 | ((A).x > -EPS) ? 32 : 0 | \
+	   ((A).y < EPS) ? 2 : 0 | ((A).y > -EPS) ? 16 : 0 | \
+	   ((A).z < EPS) ? 1 : 0 | ((A).z > -EPS) ? 8 : 0)
+
+int face_plane(float3 p, float extends)
+{
+	int outcode;
+
+	outcode = 0;
+	if (p.x > extends) outcode |= 0x01;
+	if (p.x < -extends) outcode |= 0x02;
+	if (p.y > extends) outcode |= 0x04;
+	if (p.y < -extends) outcode |= 0x08;
+	if (p.z > extends) outcode |= 0x10;
+	if (p.z < -extends) outcode |= 0x20;
+	return outcode;
+}
+
+int bevel_2d(float3 p, float extends)
+{
+	int outcode;
+	float width = extends * 2.f;
+
+	outcode = 0;
+	if (p.x + p.y > width) outcode |= 0x001;
+	if (p.x - p.y > width) outcode |= 0x002;
+	if (-p.x + p.y > width) outcode |= 0x004;
+	if (-p.x - p.y > width) outcode |= 0x008;
+	if (p.x + p.z > width) outcode |= 0x010;
+	if (p.x - p.z > width) outcode |= 0x020;
+	if (-p.x + p.z > width) outcode |= 0x040;
+	if (-p.x - p.z > width) outcode |= 0x080;
+	if (p.y + p.z > width) outcode |= 0x100;
+	if (p.y - p.z > width) outcode |= 0x200;
+	if (-p.y + p.z > width) outcode |= 0x400;
+	if (-p.y - p.z > width) outcode |= 0x800;
+	return(outcode);
+}
+
+int bevel_3d(float3 p, float extends)
+{
+	int outcode;
+	float width = extends * 3;
+
+	outcode = 0;
+	if ((p.x + p.y + p.z) > width) outcode |= 0x01;
+	if ((p.x + p.y - p.z) > width) outcode |= 0x02;
+	if ((p.x - p.y + p.z) > width) outcode |= 0x04;
+	if ((p.x - p.y - p.z) > width) outcode |= 0x08;
+	if ((-p.x + p.y + p.z) > width) outcode |= 0x10;
+	if ((-p.x + p.y - p.z) > width) outcode |= 0x20;
+	if ((-p.x - p.y + p.z) > width) outcode |= 0x40;
+	if ((-p.x - p.y - p.z) > width) outcode |= 0x80;
+	return(outcode);
+}
+
+int check_point(float3 p1, float3 p2, float alpha, int mask, float extends)
+{
+	float3 plane_point;
+
+	plane_point.x = lerp(p1.x, p2.x, alpha);
+	plane_point.y = lerp(p1.y, p2.y, alpha);
+	plane_point.z = lerp(p1.z, p2.z, alpha);
+	return(face_plane(plane_point, extends) & mask);
+}
+
+/*. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . */
+
+/* Compute intersection of P1 --> P2 line segment with face planes */
+/* Then test intersection point to see if it is on cube face       */
+/* Consider only face planes in "outcode_diff"                     */
+/* Note: Zero bits in "outcode_diff" means face line is outside of */
+
+int check_line(float3 p1, float3 p2, int outcode_diff, float extends)
+{
+
+	if ((0x01 & outcode_diff) != 0)
+		if (check_point(p1, p2, (extends - p1.x) / (p2.x - p1.x), 0x3e, extends) == INSIDE) return(INSIDE);
+	if ((0x02 & outcode_diff) != 0)
+		if (check_point(p1, p2, (-extends - p1.x) / (p2.x - p1.x), 0x3d, extends) == INSIDE) return(INSIDE);
+	if ((0x04 & outcode_diff) != 0)
+		if (check_point(p1, p2, (extends - p1.y) / (p2.y - p1.y), 0x3b, extends) == INSIDE) return(INSIDE);
+	if ((0x08 & outcode_diff) != 0)
+		if (check_point(p1, p2, (-extends - p1.y) / (p2.y - p1.y), 0x37, extends) == INSIDE) return(INSIDE);
+	if ((0x10 & outcode_diff) != 0)
+		if (check_point(p1, p2, (extends - p1.z) / (p2.z - p1.z), 0x2f, extends) == INSIDE) return(INSIDE);
+	if ((0x20 & outcode_diff) != 0)
+		if (check_point(p1, p2, (-extends - p1.z) / (p2.z - p1.z), 0x1f, extends) == INSIDE) return(INSIDE);
+	return(OUTSIDE);
+}
+
+/*. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . */
+
+/* Test if 3D point is inside 3D triangle */
+
+int point_triangle_intersection(float3 p, tripoly t)
+{
+	int sign12, sign23, sign31;
+	float3 vect12, vect23, vect31, vect1h, vect2h, vect3h;
+	float3 cross12_1p, cross23_2p, cross31_3p;
+
+	/* First, a quick bounding-box test:                               */
+	/* If P is outside triangle bbox, there cannot be an intersection. */
+
+	if (p.x > max(t.v[0].x, max(t.v[1].x, t.v[2].x))) return(OUTSIDE);
+	if (p.y > max(t.v[0].y, max(t.v[1].y, t.v[2].y))) return(OUTSIDE);
+	if (p.z > max(t.v[0].z, max(t.v[1].z, t.v[2].z))) return(OUTSIDE);
+	if (p.x < min(t.v[0].x, min(t.v[1].x, t.v[2].x))) return(OUTSIDE);
+	if (p.y < min(t.v[0].y, min(t.v[1].y, t.v[2].y))) return(OUTSIDE);
+	if (p.z < min(t.v[0].z, min(t.v[1].z, t.v[2].z))) return(OUTSIDE);
+
+	/* For each triangle side, make a vector out of it by subtracting vertexes; */
+	/* make another vector from one vertex to point P.                          */
+	/* The crossproduct of these two vectors is orthogonal to both and the      */
+	/* signs of its X,Y,Z components indicate whether P was to the inside or    */
+	/* to the outside of this triangle side.                                    */
+
+	vect12 = t.v[0] - t.v[1];
+	vect1h = t.v[0] - p;
+	cross12_1p = cross(vect12, vect1h);
+	sign12 = SIGN3(cross12_1p);      /* Extract X,Y,Z signs as 0..7 or 0...63 integer */
+
+	vect23 = t.v[1] - t.v[2];
+	vect2h = t.v[1] - p;
+	cross23_2p = cross(vect23, vect2h);
+	sign23 = SIGN3(cross23_2p);
+
+	vect31 = t.v[2] - t.v[0];
+	vect3h = t.v[2] - p;
+	cross31_3p = cross(vect31, vect3h);
+	sign31 = SIGN3(cross31_3p);
+
+	/* If all three crossproduct vectors agree in their component signs,  */
+	/* then the point must be inside all three.                           */
+	/* P cannot be OUTSIDE all three sides simultaneously.                */
+
+	   /* this is the old test; with the revised SIGN3() macro, the test
+		* needs to be revised. */
+	return ((sign12 & sign23 & sign31) == 0) ? OUTSIDE : INSIDE;
+}
+
+/*. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . */
+
+/**********************************************/
+/* This is the main algorithm procedure.      */
+/* Triangle t is compared with a unit cube,   */
+/* centered on the origin.                    */
+/* It returns INSIDE (0) or OUTSIDE(1) if t   */
+/* intersects or does not intersect the cube. */
+/**********************************************/
+
+bool t_c_intersection(tripoly t, float3 origin, float extends)
+{
+	t.v[0] -= origin;
+	t.v[1] -= origin;
+	t.v[2] -= origin;
+
+	int v1_test, v2_test, v3_test;
+	float d, denom;
+	float3 vect12, vect13, norm;
+	float3 hitpp, hitpn, hitnp, hitnn;
+
+	/* First compare all three vertexes with all six face-planes */
+	/* If any vertex is inside the cube, return immediately!     */
+
+	if ((v1_test = face_plane(t.v[0], extends)) == INSIDE) return true;
+	if ((v2_test = face_plane(t.v[1], extends)) == INSIDE) return true;
+	if ((v3_test = face_plane(t.v[2], extends)) == INSIDE) return true;
+
+	/* If all three vertexes were outside of one or more face-planes, */
+	/* return immediately with a trivial rejection!                   */
+
+	if ((v1_test & v2_test & v3_test) != 0) return false;
+
+	/* Now do the same trivial rejection test for the 12 edge planes */
+
+	v1_test |= bevel_2d(t.v[0], extends) << 8;
+	v2_test |= bevel_2d(t.v[1], extends) << 8;
+	v3_test |= bevel_2d(t.v[2], extends) << 8;
+	if ((v1_test & v2_test & v3_test) != 0) return false;
+
+	/* Now do the same trivial rejection test for the 8 corner planes */
+
+	v1_test |= bevel_3d(t.v[0], extends) << 24;
+	v2_test |= bevel_3d(t.v[1], extends) << 24;
+	v3_test |= bevel_3d(t.v[2], extends) << 24;
+	if ((v1_test & v2_test & v3_test) != 0) return false;
+
+	/* If vertex 1 and 2, as a pair, cannot be trivially rejected */
+	/* by the above tests, then see if the v[0]-->v[1] triangle edge  */
+	/* intersects the cube.  Do the same for v[0]-->v[2] and v[1]-->v[2]. */
+	/* Pass to the intersection algorithm the "OR" of the outcode */
+	/* bits, so that only those cube faces which are spanned by   */
+	/* each triangle edge need be tested.                         */
+
+	if ((v1_test & v2_test) == 0)
+		if (check_line(t.v[0], t.v[1], v1_test | v2_test, extends) == INSIDE) return true;
+	if ((v1_test & v3_test) == 0)
+		if (check_line(t.v[0], t.v[2], v1_test | v3_test, extends) == INSIDE) return true;
+	if ((v2_test & v3_test) == 0)
+		if (check_line(t.v[1], t.v[2], v2_test | v3_test, extends) == INSIDE) return true;
+
+	/* By now, we know that the triangle is not off to any side,     */
+	/* and that its sides do not penetrate the cube.  We must now    */
+	/* test for the cube intersecting the interior of the triangle.  */
+	/* We do this by looking for intersections between the cube      */
+	/* diagonals and the triangle...first finding the intersection   */
+	/* of the four diagonals with the plane of the triangle, and     */
+	/* then if that intersection is inside the cube, pursuing        */
+	/* whether the intersection point is inside the triangle itself. */
+
+	/* To find plane of the triangle, first perform crossproduct on  */
+	/* two triangle side vectors to compute the normal vector.       */
+
+	vect12 = t.v[0] - t.v[1];
+	vect13 = t.v[0] - t.v[2];
+	norm = cross(vect12, vect13);
+
+	/* The normal vector "norm" X,Y,Z components are the coefficients */
+	/* of the triangles AX + BY + CZ + D = 0 plane equation.  If we   */
+	/* solve the plane equation for X=Y=Z (a diagonal), we get        */
+	/* -D/(A+B+C) as a metric of the distance from cube center to the */
+	/* diagonal/plane intersection.  If this is between -extends and extends, */
+	/* the intersection is inside the cube.  If so, we continue by    */
+	/* doing a point/triangle intersection.                           */
+	/* Do this for all four diagonals.                                */
+
+	d = norm.x * t.v[0].x + norm.y * t.v[0].y + norm.z * t.v[0].z;
+
+	/* if one of the diagonals is parallel to the plane, the other will intersect the plane */
+	if (abs(denom = (norm.x + norm.y + norm.z)) > EPS)
+		/* skip parallel diagonals to the plane; division by 0 can occur */
+	{
+		hitpp.x = hitpp.y = hitpp.z = d / denom;
+		if (abs(hitpp.x) <= extends)
+			if (point_triangle_intersection(hitpp, t) == INSIDE) return true;
+	}
+	if (abs(denom = (norm.x + norm.y - norm.z)) > EPS)
+	{
+		hitpn.z = -(hitpn.x = hitpn.y = d / denom);
+		if (abs(hitpn.x) <= extends)
+			if (point_triangle_intersection(hitpn, t) == INSIDE) return true;
+	}
+	if (abs(denom = (norm.x - norm.y + norm.z)) > EPS)
+	{
+		hitnp.y = -(hitnp.x = hitnp.z = d / denom);
+		if (abs(hitnp.x) <= extends)
+			if (point_triangle_intersection(hitnp, t) == INSIDE) return true;
+	}
+	if (abs(denom = (norm.x - norm.y - norm.z)) > EPS)
+	{
+		hitnn.y = hitnn.z = -(hitnn.x = d / denom);
+		if (abs(hitnn.x) <= extends)
+			if (point_triangle_intersection(hitnn, t) == INSIDE) return true;
+	}
+
+	/* No edge touched the cube; no cube diagonal touched the triangle. */
+	/* We're done...there was no intersection.                          */
+
+	return false;
+
+}
