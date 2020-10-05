@@ -9,10 +9,10 @@ typedef uint node_ptr;
 
 struct TreeNode
 {
-    float3 origin;
-    float extends;
-    triangle_ptr triangles[4];
-    node_ptr children[8];
+	float3 origin;
+	float extends;
+	triangle_ptr triangles[4];
+	node_ptr children[8];
 };
 
 #include "Assets/Shaders/Intersection.compute"
@@ -25,234 +25,185 @@ uint resolution;
 float voxelSize;
 uint triangleCount;
 
-// intersection between a point and an axis aligned bounding cube at the origin (extends is half the width/height/depth).
-bool PointOAABC(float3 p, float extends)
-{
-    return !((p.x < -extends || p.x > extends) || (p.y < -extends || p.y > extends) || (p.z < -extends || p.z > extends));
-}
-
-void ProjectTriangle(tripoly tri, float3 axis, out float minVal, out float maxVal)
-{
-    minVal = FLT_MIN;
-    maxVal = FLT_MAX;
-    for (uint i = 0; i < 3; i++)
-    {
-        float val = dot(axis, tri.v[i]);
-        minVal = min(minVal, val);
-        maxVal = max(maxVal, val);
-    }
-}
-
-void ProjectBox(float extends, float3 axis, out float minVal, out float maxVal)
-{
-    float3 vertices[8];
-    vertices[0] = float3(-extends, -extends, -extends);
-    vertices[1] = float3(extends, -extends, -extends);
-    vertices[2] = float3(extends, -extends, extends);
-    vertices[3] = float3(-extends, -extends, extends);
-    vertices[4] = float3(-extends, extends, -extends);
-    vertices[5] = float3(extends, extends, -extends);
-    vertices[6] = float3(extends, extends, extends);
-    vertices[7] = float3(-extends, extends, extends);
-
-
-    minVal = FLT_MAX;
-    maxVal = FLT_MIN;
-
-    for (uint i = 0; i < 8; i++)
-    {
-        float val = dot(axis, vertices[i]);
-        minVal = min(minVal, val);
-        maxVal = max(maxVal, val);
-    }
-}
-
-bool TriangleAABB(tripoly tri, float3 origin, float extends)
-{
-	{
-        for (int i = 0; i < 3; i++)
-        {
-            tri.v[i] -= origin;
-            if (PointOAABC(tri.v[i], extends))
-                return true;
-        }
-    }
-
-
-    float3 triangleEdges[3];
-    triangleEdges[0] = tri.v[1] - tri.v[0];
-    triangleEdges[1] = tri.v[2] - tri.v[1];
-    triangleEdges[2] = tri.v[0] - tri.v[2];
-
-    float3 boxNormals[3];
-    boxNormals[0] = float3(1, 0, 0);
-    boxNormals[0] = float3(0, 1, 0);
-    boxNormals[0] = float3(0, 0, 1);
-
-    float triangleMin, triangleMax;
-    float boxMin, boxMax;
-
-	{
-        for (int i = 0; i < 3; i++)
-        {
-            ProjectTriangle(tri, boxNormals[i], triangleMin, triangleMax);
-            if (triangleMax < -extends || triangleMin > extends)
-                return false;
-        }
-    }
-
-    float3 triangleNormal = normalize(cross(tri.v[0], tri.v[1]));
-    float triangleOffset = dot(triangleNormal, tri.v[0]);
-    ProjectBox(extends, triangleNormal, boxMin, boxMax);
-    if (boxMax < triangleOffset || boxMin > triangleOffset)
-        return false;
-
-	{
-        for (int i = 0; i < 3; i++)
-            for (int j = 0; j < 3; j++)
-            {
-                float3 axis = cross(triangleEdges[i], boxNormals[j]);
-                if (length(axis) == 0)
-                    continue;
-
-                axis = normalize(axis);
-
-                ProjectBox(extends, axis, boxMin, boxMax);
-                ProjectTriangle(tri, axis, triangleMin, triangleMax);
-                if (boxMax < triangleMin || boxMin > triangleMax)
-                    return false;
-            }
-    }
-
-    return true;
-}
-
 uint Idx3ToIdx(uint3 idx3, uint res)
 {
-    return idx3.x + (idx3.z * res) + (idx3.y * res * res);
+	return idx3.x + (idx3.z * res) + (idx3.y * res * res);
 }
 
 uint3 IdxToIdx3(uint idx, uint res)
 {
-    return uint3(idx % res, idx / (res * res), (idx / res) % res);
+	return uint3(idx % res, idx / (res * res), (idx / res) % res);
 }
 
 [numthreads(1024, 1, 1)]
 void CSMain(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
 {
-    uint idx = id.x + (1024 * groupId.x);
+	const uint idx = id.x;
 
-    if (idx >= (resolution * resolution * resolution))
-        return;
+	if (idx >= (resolution * resolution * resolution))
+		return;
 
-    uint3 idx3 = IdxToIdx3(idx, resolution);
-    float fullSize = resolution * voxelSize;
-    float boundSize = voxelSize;
-    float extends = boundSize * 0.5f;
-    float3 origin = (float3(idx3.x, idx3.y, idx3.z) * float3(boundSize, boundSize, boundSize)) + float3(extends, extends, extends) - (fullSize * 0.5f);
+	uint3 idx3 = IdxToIdx3(idx, resolution);
+	float fullSize = resolution * voxelSize;
+	float boundSize = voxelSize;
+	float extends = boundSize * 0.5f;
+	float3 origin = (float3(idx3.x, idx3.y, idx3.z) * float3(boundSize, boundSize, boundSize)) + float3(extends, extends, extends) - (fullSize * 0.5f);
 
-    triangle_ptr triangleIndices[4];
-    triangleIndices[0] = nullptr;
-    triangleIndices[1] = nullptr;
-    triangleIndices[2] = nullptr;
-    triangleIndices[3] = nullptr;
+	triangle_ptr triangleIndices[4];
+	triangleIndices[0] = nullptr;
+	triangleIndices[1] = nullptr;
+	triangleIndices[2] = nullptr;
+	triangleIndices[3] = nullptr;
 
-    bool trianglesFound = false;
-    uint lastIdx = 0;
+	bool trianglesFound = false;
+	uint lastIdx = 0;
 	{
-        for (uint i = 0; i < triangleCount; i++)
-        {
-            if (t_c_intersection(triangles[i], origin, extends))
-            {
-                trianglesFound = true;
-                triangleIndices[lastIdx] = i + 1;
-                lastIdx++;
-                if (lastIdx >= 4)
-                    break;
-            }
-        }
-    }
+		for (uint i = 0; i < triangleCount; i++)
+		{
+			if (t_c_intersection(triangles[i], origin, extends))
+			{
+				trianglesFound = true;
+				triangleIndices[lastIdx] = i + 1;
+				lastIdx++;
+				if (lastIdx >= 4)
+					break;
+			}
+		}
+	}
 
-    uint maxGenerationCount = uint((log((float) triangleCount) / log(8.f)) * 3.f); // Technically it should be infinity but we don't want that, so we call it 3x the minimal generation count.
+	const uint maxGenerationCount = uint((log((float)triangleCount) / log(8.f)) * 3.f); // Technically it should be infinity but we don't want that, so we call it 3x the minimal generation count.
 
-    uint nodesInGeneration = resolution * resolution * resolution;
-    uint generationResolution = resolution;
-    uint childrenResolution = resolution;
-    uint totalNodes = 0;
-    uint generationalIdx = idx;
-    uint3 generationIdx3 = idx3;
-    uint childIdx = 0;
-    uint3 childIdx3;
+	uint nodesInGeneration = resolution * resolution * resolution;
+	uint generationResolution = resolution;
+	uint childrenResolution = resolution;
+	uint totalNodes = 0;
+	uint childTotal = 0;
+	uint generationalIdx = idx;
+	uint3 generationIdx3 = idx3;
+	uint childIdx = 0;
+	uint3 childIdx3;
 
-    for (uint generation = 0; generation < maxGenerationCount; generation++)
-    {
-        TreeNode node;
-        node.origin = origin;
-        node.extends = extends;
+	{
+		for (uint generation = 0; generation < maxGenerationCount; generation++)
+		{
+			TreeNode node = { origin, extends, { /*0*/nullptr, /*1*/nullptr, /*2*/nullptr, /*3*/nullptr }, { /*0*/nullptr, /*1*/nullptr, /*2*/nullptr, /*3*/nullptr, /*4*/nullptr, /*5*/nullptr, /*6*/nullptr, /*7*/nullptr } };
 
-        if (generation == 0)
-        {
-            for (int i = 0; i < 4; i++)
-                node.triangles[i] = triangleIndices[i];
-            
-            for (int i = 0; i < 4; i++)
-                node.children[i] = nullptr;
-        }
-        else
-        {
-            for (int i = 0; i < 4; i++)
-                node.triangles[i] = nullptr;
-            
-            childIdx3 = IdxToIdx3(childIdx, childrenResolution);
-            node.children[0] = hierarchy[childIdx]; // 0, 0, 0
-            node.children[1] = hierarchy[Idx3ToIdx(childIdx3 + uint3(1, 0, 0), childrenResolution)]; // 1, 0, 0
-            node.children[2] = hierarchy[Idx3ToIdx(childIdx3 + uint3(1, 0, 1), childrenResolution)]; // 1, 0, 1
-            node.children[3] = hierarchy[Idx3ToIdx(childIdx3 + uint3(0, 0, 1), childrenResolution)]; // 0, 0, 1
-            node.children[4] = hierarchy[Idx3ToIdx(childIdx3 + uint3(0, 1, 0), childrenResolution)]; // 0, 1, 0
-            node.children[5] = hierarchy[Idx3ToIdx(childIdx3 + uint3(1, 1, 0), childrenResolution)]; // 1, 1, 0
-            node.children[6] = hierarchy[Idx3ToIdx(childIdx3 + uint3(1, 1, 1), childrenResolution)]; // 1, 1, 1
-            node.children[7] = hierarchy[Idx3ToIdx(childIdx3 + uint3(0, 1, 1), childrenResolution)]; // 0, 1, 1
-        }
+			if (generation == 0)
+			{
+				node.triangles[0] = triangleIndices[0];
+				node.triangles[1] = triangleIndices[1];
+				node.triangles[2] = triangleIndices[2];
+				node.triangles[3] = triangleIndices[3];
+			}
+			else
+			{
+				childIdx3 = IdxToIdx3(childIdx, childrenResolution);
+				node.children[0] = childTotal + Idx3ToIdx(childIdx3, childrenResolution) + 1; // 0, 0, 0
+				node.children[1] = childTotal + Idx3ToIdx(childIdx3 + uint3(1, 0, 0), childrenResolution) + 1; // 1, 0, 0
+				node.children[2] = childTotal + Idx3ToIdx(childIdx3 + uint3(1, 0, 1), childrenResolution) + 1; // 1, 0, 1
+				node.children[3] = childTotal + Idx3ToIdx(childIdx3 + uint3(0, 0, 1), childrenResolution) + 1; // 0, 0, 1
+				node.children[4] = childTotal + Idx3ToIdx(childIdx3 + uint3(0, 1, 0), childrenResolution) + 1; // 0, 1, 0
+				node.children[5] = childTotal + Idx3ToIdx(childIdx3 + uint3(1, 1, 0), childrenResolution) + 1; // 1, 1, 0
+				node.children[6] = childTotal + Idx3ToIdx(childIdx3 + uint3(1, 1, 1), childrenResolution) + 1; // 1, 1, 1
+				node.children[7] = childTotal + Idx3ToIdx(childIdx3 + uint3(0, 1, 1), childrenResolution) + 1; // 0, 1, 1
+			}
 
-        uint3 subIdx3;
-        subIdx3.x = idx3.x % (uint) (floor(pow(2, generation)));
-        subIdx3.y = idx3.y % (uint) (floor(pow(2, generation)));
-        subIdx3.z = idx3.z % (uint) (floor(pow(2, generation)));
-        if (subIdx3.x != 0 || subIdx3.y != 0 || subIdx3.z != 0)
-        {
-            return;
-        }
+			uint3 subIdx3;
+			subIdx3.x = idx3.x % (uint) (floor(pow(2, generation)));
+			subIdx3.y = idx3.y % (uint) (floor(pow(2, generation)));
+			subIdx3.z = idx3.z % (uint) (floor(pow(2, generation)));
+			if (subIdx3.x != 0 || subIdx3.y != 0 || subIdx3.z != 0)
+			{
+				return;
+			}
 
-        uint3 parentIdx3 = floor(generationIdx3 / 2.f);
+			uint3 parentIdx3 = floor(generationIdx3 / 2.f);
 
-        if (generation == 0)
-        {
-            if (trianglesFound)
-            {
-                uint indx = octree.IncrementCounter();
-                octree[indx] = node;
-                hierarchy[generationalIdx] = indx + 1;
-            }
-        }
-        else
-        {
-            uint indx = octree.IncrementCounter();
-            octree[indx] = node;
-            hierarchy[generationalIdx] = indx + 1;
-        }
+			if (generation == 0)
+			{
+				if (trianglesFound)
+				{
+					uint indx = octree.IncrementCounter();
+					octree[indx] = node;
+					hierarchy[totalNodes + generationalIdx] = indx + 1;
+				}
+			}
+			else
+			{
+				uint indx = octree.IncrementCounter();
+				octree[indx] = node;
+				hierarchy[totalNodes + generationalIdx] = indx + 1;
+			}
 
-        if (extends * 2.f >= fullSize)
-            return;
+			if (extends * 2.f >= fullSize)
+				return;
 
-        childIdx = generationalIdx;
-        totalNodes += nodesInGeneration;
-        nodesInGeneration /= 8;
-        childrenResolution = generationResolution;
-        generationResolution /= 2;
-        generationalIdx = totalNodes;
-        childIdx3 = generationIdx3;
-        generationIdx3 = parentIdx3;
-        extends *= 2.f;
-        origin = (float3(idx3.x, idx3.y, idx3.z) * float3(boundSize, boundSize, boundSize)) + float3(extends, extends, extends) - (fullSize * 0.5f);
-    }
+			childIdx = generationalIdx;
+			childTotal = totalNodes;
+			totalNodes += nodesInGeneration;
+			nodesInGeneration = nodesInGeneration / 8;
+			childrenResolution = generationResolution;
+			generationResolution = generationResolution / 2;
+			generationalIdx = Idx3ToIdx(parentIdx3, generationResolution);
+			childIdx3 = generationIdx3;
+			generationIdx3 = parentIdx3;
+			extends *= 2.f;
+			origin = (float3(idx3.x, idx3.y, idx3.z) * float3(boundSize, boundSize, boundSize)) + float3(extends, extends, extends) - (fullSize * 0.5f);
+		}
+	}
+
+	//GroupMemoryBarrierWithGroupSync();
+
+	//nodesInGeneration = resolution * resolution * resolution;
+	//generationResolution = resolution;
+	//childrenResolution = resolution;
+	//totalNodes = 0;
+	//generationalIdx = idx;
+	//generationIdx3 = idx3;
+	//childIdx = 0;
+	//childIdx3;
+
+	//{
+	//	for (uint generation = 0; generation < maxGenerationCount; generation++)
+	//	{
+	//		if (generation != 0)
+	//		{
+	//			TreeNode node = octree[hierarchy[generationalIdx] - 1];
+	//			node.children[0] = hierarchy[childIdx]; // 0, 0, 0
+	//			node.children[1] = hierarchy[Idx3ToIdx(childIdx3 + uint3(1, 0, 0), childrenResolution)]; // 1, 0, 0
+	//			node.children[2] = hierarchy[Idx3ToIdx(childIdx3 + uint3(1, 0, 1), childrenResolution)]; // 1, 0, 1
+	//			node.children[3] = hierarchy[Idx3ToIdx(childIdx3 + uint3(0, 0, 1), childrenResolution)]; // 0, 0, 1
+	//			node.children[4] = hierarchy[Idx3ToIdx(childIdx3 + uint3(0, 1, 0), childrenResolution)]; // 0, 1, 0
+	//			node.children[5] = hierarchy[Idx3ToIdx(childIdx3 + uint3(1, 1, 0), childrenResolution)]; // 1, 1, 0
+	//			node.children[6] = hierarchy[Idx3ToIdx(childIdx3 + uint3(1, 1, 1), childrenResolution)]; // 1, 1, 1
+	//			node.children[7] = hierarchy[Idx3ToIdx(childIdx3 + uint3(0, 1, 1), childrenResolution)]; // 0, 1, 1
+	//			octree[hierarchy[generationalIdx] - 1] = node;
+	//		}
+
+	//		uint3 subIdx3;
+	//		subIdx3.x = idx3.x % (uint) (floor(pow(2, generation)));
+	//		subIdx3.y = idx3.y % (uint) (floor(pow(2, generation)));
+	//		subIdx3.z = idx3.z % (uint) (floor(pow(2, generation)));
+	//		if (subIdx3.x != 0 || subIdx3.y != 0 || subIdx3.z != 0)
+	//		{
+	//			break;
+	//		}
+
+	//		uint3 parentIdx3 = floor(generationIdx3 / 2.f);
+
+	//		if (extends * 2.f >= fullSize)
+	//			break;
+
+	//		childIdx = generationalIdx;
+	//		totalNodes += nodesInGeneration;
+	//		nodesInGeneration /= 8;
+	//		childrenResolution = generationResolution;
+	//		generationResolution /= 2;
+	//		generationalIdx = totalNodes;
+	//		childIdx3 = generationIdx3;
+	//		generationIdx3 = parentIdx3;
+	//		extends *= 2.f;
+	//		origin = (float3(idx3.x, idx3.y, idx3.z) * float3(boundSize, boundSize, boundSize)) + float3(extends, extends, extends) - (fullSize * 0.5f);
+	//	}
+	//}
 }

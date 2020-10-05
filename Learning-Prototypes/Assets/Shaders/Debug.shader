@@ -24,7 +24,7 @@
 
 			Blend SrcAlpha OneMinusSrcAlpha
 			ZWrite On
-			Cull Back
+			Cull Off
 
 			HLSLPROGRAM
 			#pragma vertex vert

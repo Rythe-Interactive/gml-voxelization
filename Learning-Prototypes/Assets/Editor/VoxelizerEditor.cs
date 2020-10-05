@@ -37,6 +37,20 @@ public class VoxelizerEditor : Editor
         }
     }
 
+    private void OnEnable()
+    {
+        Voxelizer vox = (target as Voxelizer);
+        vox.drawGizmos = true;
+        vox.meshFilter.GetComponent<MeshRenderer>().enabled = true;
+    }
+
+    private void OnDisable()
+    {
+        Voxelizer vox = (target as Voxelizer);
+        vox.drawGizmos = false;
+        vox.meshFilter.GetComponent<MeshRenderer>().enabled = false;
+    }
+
     public void OnSceneGUI()
     {
         if (rotate)

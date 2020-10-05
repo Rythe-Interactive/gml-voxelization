@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEditor;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Debug = UnityEngine.Debug;
@@ -8,12 +9,16 @@ using node_ptr = System.UInt32;
 
 public class Voxelizer : MonoBehaviour
 {
+    public MeshFilter meshFilter;
     public ComputeShader voxelizeShader;
     public uint resolution;
     public bool drawTriangles;
     public bool drawNodes;
-    public bool drawLeavesOnly;
-    public bool draw0thChild;
+    public uint G;
+    public bool drawGthGenerationOnly;
+    [Range(0, 7)]
+    public uint N;
+    public bool drawNthChild;
 
     public struct tripoly
     {
@@ -51,13 +56,39 @@ public class Voxelizer : MonoBehaviour
     [HideInInspector]
     public TreeNode[] data;
     [HideInInspector]
+    public node_ptr[] hierarchy;
+    [HideInInspector]
     public uint root;
     int nodeCount;
     float maxExtend;
     [HideInInspector]
     public List<tripoly> triangles = new List<tripoly>();
     [HideInInspector]
-    public int generationCount = 0;
+    public uint generationCount = 0;
+
+    [HideInInspector]
+    public Dictionary<float, int> generations;
+    [HideInInspector]
+    public Dictionary<int, int> resolutions;
+
+    [HideInInspector]
+    public bool drawGizmos;
+
+    int Idx3ToIdx(Vector3Int idx3, int res)
+    {
+        return idx3.x + (idx3.z * res) + (idx3.y * res * res);
+    }
+
+    Vector3Int IdxToIdx3(int idx, int res)
+    {
+        return new Vector3Int(idx % res, idx / (res * res), (idx / res) % res);
+    }
+
+    private void OnValidate()
+    {
+        if (G >= generationCount)
+            G = generationCount;
+    }
 
     uint maxNodes(uint generation)
     {
@@ -74,21 +105,12 @@ public class Voxelizer : MonoBehaviour
         method.Invoke(new object(), null);
     }
 
-    public void Awake()
-    {
-        Voxelize();
-    }
-
     public void Voxelize()
     {
         if (resolution == 0)
             return;
 
-        MeshFilter filter = GetComponent<MeshFilter>();
-        if (filter == null)
-            return;
-
-        model = filter.sharedMesh;
+        model = meshFilter.sharedMesh;
         if (model == null)
             return;
 
@@ -107,7 +129,7 @@ public class Voxelizer : MonoBehaviour
         for (uint i = 0; i < model.triangles.Length; i += 3)
         {
             indices.Add(i / 3);
-            triangles.Add(new tripoly(transform.localToWorldMatrix * model.vertices[model.triangles[i]], transform.localToWorldMatrix * model.vertices[model.triangles[i + 1]], transform.localToWorldMatrix * model.vertices[model.triangles[i + 2]]));
+            triangles.Add(new tripoly(meshFilter.transform.localToWorldMatrix * model.vertices[model.triangles[i]], meshFilter.transform.localToWorldMatrix * model.vertices[model.triangles[i + 1]], meshFilter.transform.localToWorldMatrix * model.vertices[model.triangles[i + 2]]));
         }
 
         uint triangleCount = (uint)(triangles.Count);
@@ -129,7 +151,7 @@ public class Voxelizer : MonoBehaviour
         triangleBuffer.SetData(triangles);
 
         ComputeBuffer hierarchyBuffer = new ComputeBuffer(nodeAllocationCount, sizeof(uint), ComputeBufferType.Structured);
-        uint[] hierarchy = new uint[nodeAllocationCount];
+        hierarchy = new uint[nodeAllocationCount];
         hierarchyBuffer.SetData(hierarchy);
 
         int voxelKernel = voxelizeShader.FindKernel("CSMain");
@@ -155,6 +177,9 @@ public class Voxelizer : MonoBehaviour
         clock.Stop();
         Debug.Log("voxelization took: " + elapsed.TotalMilliseconds + "ms");
 
+        hierarchyBuffer.GetData(hierarchy);
+
+
         var countBuffer = new ComputeBuffer(1, sizeof(int), ComputeBufferType.IndirectArguments);
 
         // Copy the count.
@@ -171,23 +196,61 @@ public class Voxelizer : MonoBehaviour
         octree.GetData(data);
     }
 
-    public void OnDrawGizmos()
+    private void OnDrawGizmos()
     {
-        int oldGenerationCount = generationCount;
+        if (drawGizmos)
+            DrawGizmos();
+    }
+
+    public void DrawGizmos()
+    {
+        uint oldGenerationCount = generationCount;
         float biggestSize = 0;
         root = 0;
+        SortedSet<float> sizes = new SortedSet<float>();
 
         if (data != null)
         {
-            int generation = -1;
             float extend = -1;
+
+            for (int i = 0; i < data.Length; i++)
+            {
+                if (data[i].extends != 0 && extend != data[i].extends)
+                {
+                    extend = data[i].extends;
+                    sizes.Add(extend);
+
+                    if (biggestSize < data[i].extends)
+                    {
+                        biggestSize = data[i].extends;
+                        root = (uint)i;
+                    }
+                }
+            }
+
+            int gen = 0;
+            generations = new Dictionary<float, int>();
+            resolutions = new Dictionary<int, int>();
+            int res = (int)resolution;
+            foreach (float size in sizes)
+            {
+                resolutions[gen] = res;
+                generations[size] = gen;
+                res /= 2;
+                gen++;
+            }
+
+            generationCount = (uint)(sizes.Count - 1);
+
+            int generation = -1;
+            extend = -1;
             for (int i = 0; i < data.Length; i++)
             {
                 if (extend != data[i].extends)
                 {
                     extend = data[i].extends;
-                    generation++;
-                    generationCount = Mathf.Max(generationCount, generation);
+                    generation = generations[extend];
+                    res = resolutions[generation];
                 }
 
                 bool hasTriangle = false;
@@ -272,36 +335,207 @@ public class Voxelizer : MonoBehaviour
 
                 if (hasTriangle)
                     Gizmos.color = Color.yellow;
-                else if (!drawLeavesOnly)
-                    Gizmos.color = Color.blue;
                 else
+                    Gizmos.color = Color.blue;
+
+                if (drawGthGenerationOnly && generation != G)
                     continue;
 
-                if (biggestSize < data[i].extends)
-                {
-                    biggestSize = data[i].extends;
-                    root = (uint)i;
-                }
-
                 if (drawNodes)
+                {
                     Gizmos.DrawWireCube(data[i].origin, new Vector3(data[i].extends, data[i].extends, data[i].extends) * 2f);
+                }
             }
 
-            if (draw0thChild)
-                    Draw0thChildBranch(data[root]);
+            if (drawNthChild)
+                DrawNthChildBranch(data[root]);
         }
 
         if (generationCount != oldGenerationCount)
+        {
             Debug.Log("generated " + (generationCount + 1) + " generations");
+            int gen = 0;
+            foreach (float size in sizes)
+            {
+                Debug.Log("generation " + gen++ + " has size " + size);
+            }
+        }
     }
 
-    void Draw0thChildBranch(TreeNode node)
+    void DrawNthChildBranch(TreeNode node)
     {
         Gizmos.DrawWireCube(node.origin, new Vector3(node.extends, node.extends, node.extends) * 2f);
 
-        if (node.child0 != 0)
+        switch (N)
         {
-            Draw0thChildBranch(data[node.child0 - 1]);
+            case 0:
+                if (node.child0 != 0)
+                {
+                    if (node.child0 - 1 >= hierarchy.Length)
+                    {
+                        Debug.Log("dafuq?H");
+                        return;
+                    }
+
+                    if (hierarchy[node.child0 - 1] == 0)
+                        return;
+
+                    if (hierarchy[node.child0 - 1] - 1 >= data.Length)
+                    {
+                        Debug.Log("dafuq?D");
+                        return;
+                    }
+
+                    DrawNthChildBranch(data[hierarchy[node.child0 - 1] - 1]);
+                }
+                break;
+            case 1:
+                if (node.child1 != 0)
+                {
+                    if (node.child1 - 1 >= hierarchy.Length)
+                    {
+                        Debug.Log("dafuq?H");
+                        return;
+                    }
+
+                    if (hierarchy[node.child1 - 1] == 0)
+                        return;
+
+                    if (hierarchy[node.child1 - 1] - 1 >= data.Length)
+                    {
+                        Debug.Log("dafuq?D");
+                        return;
+                    }
+
+                    DrawNthChildBranch(data[hierarchy[node.child1 - 1] - 1]);
+                }
+                break;
+            case 2:
+                if (node.child2 != 0)
+                {
+                    if (node.child2 - 1 >= hierarchy.Length)
+                    {
+                        Debug.Log("dafuq?H");
+                        return;
+                    }
+
+                    if (hierarchy[node.child2 - 1] == 0)
+                        return;
+
+                    if (hierarchy[node.child2 - 1] - 1 >= data.Length)
+                    {
+                        Debug.Log("dafuq?D");
+                        return;
+                    }
+
+                    DrawNthChildBranch(data[hierarchy[node.child2 - 1] - 1]);
+                }
+                break;
+            case 3:
+                if (node.child3 != 0)
+                {
+                    if (node.child3 - 1 >= hierarchy.Length)
+                    {
+                        Debug.Log("dafuq?H");
+                        return;
+                    }
+
+                    if (hierarchy[node.child3 - 1] == 0)
+                        return;
+
+                    if (hierarchy[node.child3 - 1] - 1 >= data.Length)
+                    {
+                        Debug.Log("dafuq?D");
+                        return;
+                    }
+
+                    DrawNthChildBranch(data[hierarchy[node.child3 - 1] - 1]);
+                }
+                break;
+            case 4:
+                if (node.child4 != 0)
+                {
+                    if (node.child4 - 1 >= hierarchy.Length)
+                    {
+                        Debug.Log("dafuq?H");
+                        return;
+                    }
+
+                    if (hierarchy[node.child4 - 1] == 0)
+                        return;
+
+                    if (hierarchy[node.child4 - 1] - 1 >= data.Length)
+                    {
+                        Debug.Log("dafuq?D");
+                        return;
+                    }
+
+                    DrawNthChildBranch(data[hierarchy[node.child4 - 1] - 1]);
+                }
+                break;
+            case 5:
+                if (node.child5 != 0)
+                {
+                    if (node.child5 - 1 >= hierarchy.Length)
+                    {
+                        Debug.Log("dafuq?H");
+                        return;
+                    }
+
+                    if (hierarchy[node.child5 - 1] == 0)
+                        return;
+
+                    if (hierarchy[node.child5 - 1] - 1 >= data.Length)
+                    {
+                        Debug.Log("dafuq?D");
+                        return;
+                    }
+
+                    DrawNthChildBranch(data[hierarchy[node.child5 - 1] - 1]);
+                }
+                break;
+            case 6:
+                if (node.child6 != 0)
+                {
+                    if (node.child6 - 1 >= hierarchy.Length)
+                    {
+                        Debug.Log("dafuq?H");
+                        return;
+                    }
+
+                    if (hierarchy[node.child6 - 1] == 0)
+                        return;
+
+                    if (hierarchy[node.child6 - 1] - 1 >= data.Length)
+                    {
+                        Debug.Log("dafuq?D");
+                        return;
+                    }
+
+                    DrawNthChildBranch(data[hierarchy[node.child6 - 1] - 1]);
+                }
+                break;
+            case 7:
+                if (node.child7 != 0)
+                {
+                    if (node.child7 - 1 >= hierarchy.Length)
+                    {
+                        Debug.Log("dafuq?H");
+                        return;
+                    }
+
+                    if (hierarchy[node.child7 - 1] == 0)
+                        return;
+
+                    if (hierarchy[node.child7 - 1] - 1 >= data.Length)
+                    {
+                        Debug.Log("dafuq?D");
+                        return;
+                    }
+
+                    DrawNthChildBranch(data[hierarchy[node.child7 - 1] - 1]);
+                }
+                break;
         }
     }
 }
