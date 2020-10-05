@@ -40,8 +40,10 @@ void CSMain(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
 {
 	const uint idx = id.x;
 
+	bool returned = false;
+
 	if (idx >= (resolution * resolution * resolution))
-		return;
+		returned = true;
 
 	uint3 idx3 = IdxToIdx3(idx, resolution);
 	float fullSize = resolution * voxelSize;
@@ -86,26 +88,31 @@ void CSMain(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
 	{
 		for (uint generation = 0; generation < maxGenerationCount; generation++)
 		{
+			AllMemoryBarrierWithGroupSync();
+
 			TreeNode node = { origin, extends, { /*0*/nullptr, /*1*/nullptr, /*2*/nullptr, /*3*/nullptr }, { /*0*/nullptr, /*1*/nullptr, /*2*/nullptr, /*3*/nullptr, /*4*/nullptr, /*5*/nullptr, /*6*/nullptr, /*7*/nullptr } };
 
-			if (generation == 0)
+			if (!returned)
 			{
-				node.triangles[0] = triangleIndices[0];
-				node.triangles[1] = triangleIndices[1];
-				node.triangles[2] = triangleIndices[2];
-				node.triangles[3] = triangleIndices[3];
-			}
-			else
-			{
-				childIdx3 = IdxToIdx3(childIdx, childrenResolution);
-				node.children[0] = childTotal + Idx3ToIdx(childIdx3, childrenResolution) + 1; // 0, 0, 0
-				node.children[1] = childTotal + Idx3ToIdx(childIdx3 + uint3(1, 0, 0), childrenResolution) + 1; // 1, 0, 0
-				node.children[2] = childTotal + Idx3ToIdx(childIdx3 + uint3(1, 0, 1), childrenResolution) + 1; // 1, 0, 1
-				node.children[3] = childTotal + Idx3ToIdx(childIdx3 + uint3(0, 0, 1), childrenResolution) + 1; // 0, 0, 1
-				node.children[4] = childTotal + Idx3ToIdx(childIdx3 + uint3(0, 1, 0), childrenResolution) + 1; // 0, 1, 0
-				node.children[5] = childTotal + Idx3ToIdx(childIdx3 + uint3(1, 1, 0), childrenResolution) + 1; // 1, 1, 0
-				node.children[6] = childTotal + Idx3ToIdx(childIdx3 + uint3(1, 1, 1), childrenResolution) + 1; // 1, 1, 1
-				node.children[7] = childTotal + Idx3ToIdx(childIdx3 + uint3(0, 1, 1), childrenResolution) + 1; // 0, 1, 1
+				if (generation == 0)
+				{
+					node.triangles[0] = triangleIndices[0];
+					node.triangles[1] = triangleIndices[1];
+					node.triangles[2] = triangleIndices[2];
+					node.triangles[3] = triangleIndices[3];
+				}
+				else
+				{
+					childIdx3 = IdxToIdx3(childIdx, childrenResolution);
+					node.children[0] = hierarchy[childTotal + Idx3ToIdx(childIdx3, childrenResolution)]; // 0, 0, 0
+					node.children[1] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(1, 0, 0), childrenResolution)]; // 1, 0, 0
+					node.children[2] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(1, 0, 1), childrenResolution)]; // 1, 0, 1
+					node.children[3] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(0, 0, 1), childrenResolution)]; // 0, 0, 1
+					node.children[4] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(0, 1, 0), childrenResolution)]; // 0, 1, 0
+					node.children[5] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(1, 1, 0), childrenResolution)]; // 1, 1, 0
+					node.children[6] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(1, 1, 1), childrenResolution)]; // 1, 1, 1
+					node.children[7] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(0, 1, 1), childrenResolution)]; // 0, 1, 1
+				}
 			}
 
 			uint3 subIdx3;
@@ -114,29 +121,47 @@ void CSMain(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
 			subIdx3.z = idx3.z % (uint) (floor(pow(2, generation)));
 			if (subIdx3.x != 0 || subIdx3.y != 0 || subIdx3.z != 0)
 			{
-				return;
+				returned = true;
 			}
 
 			uint3 parentIdx3 = floor(generationIdx3 / 2.f);
 
-			if (generation == 0)
+			if (!returned)
 			{
-				if (trianglesFound)
+				if (generation == 0)
 				{
-					uint indx = octree.IncrementCounter();
-					octree[indx] = node;
-					hierarchy[totalNodes + generationalIdx] = indx + 1;
+					if (trianglesFound)
+					{
+						uint indx = octree.IncrementCounter();
+						octree[indx] = node;
+						hierarchy[totalNodes + generationalIdx] = indx + 1;
+					}
 				}
-			}
-			else
-			{
-				uint indx = octree.IncrementCounter();
-				octree[indx] = node;
-				hierarchy[totalNodes + generationalIdx] = indx + 1;
+				else
+				{
+					bool hasChildren = false;
+					hasChildren = hasChildren || (node.children[0] != nullptr);
+					hasChildren = hasChildren || (node.children[1] != nullptr);
+					hasChildren = hasChildren || (node.children[2] != nullptr);
+					hasChildren = hasChildren || (node.children[3] != nullptr);
+					hasChildren = hasChildren || (node.children[4] != nullptr);
+					hasChildren = hasChildren || (node.children[5] != nullptr);
+					hasChildren = hasChildren || (node.children[6] != nullptr);
+					hasChildren = hasChildren || (node.children[7] != nullptr);
+
+					if (hasChildren)
+					{
+						uint indx = octree.IncrementCounter();
+						octree[indx] = node;
+						hierarchy[totalNodes + generationalIdx] = indx + 1;
+					}
+				}
 			}
 
 			if (extends * 2.f >= fullSize)
-				return;
+			{
+				returned = true;
+			}
 
 			childIdx = generationalIdx;
 			childTotal = totalNodes;

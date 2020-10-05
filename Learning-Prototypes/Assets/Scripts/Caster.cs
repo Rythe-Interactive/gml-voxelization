@@ -75,22 +75,23 @@ public class Caster : MonoBehaviour
 
             if (!bruteForce)
             {
-                if (node.child0 != 0 && voxelizer.hierarchy[node.child0 - 1] != 0)
-                    TraverseTree(voxelizer.data[voxelizer.hierarchy[node.child0 - 1] - 1], ray);
-                if (node.child1 != 0 && voxelizer.hierarchy[node.child1 - 1] != 0)
-                    TraverseTree(voxelizer.data[voxelizer.hierarchy[node.child1 - 1] - 1], ray);
-                if (node.child2 != 0 && voxelizer.hierarchy[node.child2 - 1] != 0)
-                    TraverseTree(voxelizer.data[voxelizer.hierarchy[node.child2 - 1] - 1], ray);
-                if (node.child3 != 0 && voxelizer.hierarchy[node.child3 - 1] != 0)
-                    TraverseTree(voxelizer.data[voxelizer.hierarchy[node.child3 - 1] - 1], ray);
-                if (node.child4 != 0 && voxelizer.hierarchy[node.child4 - 1] != 0)
-                    TraverseTree(voxelizer.data[voxelizer.hierarchy[node.child4 - 1] - 1], ray);
-                if (node.child5 != 0 && voxelizer.hierarchy[node.child5 - 1] != 0)
-                    TraverseTree(voxelizer.data[voxelizer.hierarchy[node.child5 - 1] - 1], ray);
-                if (node.child6 != 0 && voxelizer.hierarchy[node.child6 - 1] != 0)
-                    TraverseTree(voxelizer.data[voxelizer.hierarchy[node.child6 - 1] - 1], ray);
-                if (node.child7 != 0 && voxelizer.hierarchy[node.child7 - 1] != 0)
-                    TraverseTree(voxelizer.data[voxelizer.hierarchy[node.child7 - 1] - 1], ray);
-            } }
+                if (node.child0 != 0)
+                    TraverseTree(voxelizer.data[node.child0 - 1], ray);
+                if (node.child1 != 0)
+                    TraverseTree(voxelizer.data[node.child1 - 1], ray);
+                if (node.child2 != 0)
+                    TraverseTree(voxelizer.data[node.child2 - 1], ray);
+                if (node.child3 != 0)
+                    TraverseTree(voxelizer.data[node.child3 - 1], ray);
+                if (node.child4 != 0)
+                    TraverseTree(voxelizer.data[node.child4 - 1], ray);
+                if (node.child5 != 0)
+                    TraverseTree(voxelizer.data[node.child5 - 1], ray);
+                if (node.child6 != 0)
+                    TraverseTree(voxelizer.data[node.child6 - 1], ray);
+                if (node.child7 != 0)
+                    TraverseTree(voxelizer.data[node.child7 - 1], ray);
+            }
+        }
     }
 }

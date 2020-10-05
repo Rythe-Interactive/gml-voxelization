@@ -371,169 +371,49 @@ public class Voxelizer : MonoBehaviour
             case 0:
                 if (node.child0 != 0)
                 {
-                    if (node.child0 - 1 >= hierarchy.Length)
-                    {
-                        Debug.Log("dafuq?H");
-                        return;
-                    }
-
-                    if (hierarchy[node.child0 - 1] == 0)
-                        return;
-
-                    if (hierarchy[node.child0 - 1] - 1 >= data.Length)
-                    {
-                        Debug.Log("dafuq?D");
-                        return;
-                    }
-
-                    DrawNthChildBranch(data[hierarchy[node.child0 - 1] - 1]);
+                    DrawNthChildBranch(data[node.child0 - 1]);
                 }
                 break;
             case 1:
                 if (node.child1 != 0)
                 {
-                    if (node.child1 - 1 >= hierarchy.Length)
-                    {
-                        Debug.Log("dafuq?H");
-                        return;
-                    }
-
-                    if (hierarchy[node.child1 - 1] == 0)
-                        return;
-
-                    if (hierarchy[node.child1 - 1] - 1 >= data.Length)
-                    {
-                        Debug.Log("dafuq?D");
-                        return;
-                    }
-
-                    DrawNthChildBranch(data[hierarchy[node.child1 - 1] - 1]);
+                    DrawNthChildBranch(data[node.child1 - 1]);
                 }
                 break;
             case 2:
                 if (node.child2 != 0)
                 {
-                    if (node.child2 - 1 >= hierarchy.Length)
-                    {
-                        Debug.Log("dafuq?H");
-                        return;
-                    }
-
-                    if (hierarchy[node.child2 - 1] == 0)
-                        return;
-
-                    if (hierarchy[node.child2 - 1] - 1 >= data.Length)
-                    {
-                        Debug.Log("dafuq?D");
-                        return;
-                    }
-
-                    DrawNthChildBranch(data[hierarchy[node.child2 - 1] - 1]);
+                    DrawNthChildBranch(data[node.child2 - 1]);
                 }
                 break;
             case 3:
                 if (node.child3 != 0)
                 {
-                    if (node.child3 - 1 >= hierarchy.Length)
-                    {
-                        Debug.Log("dafuq?H");
-                        return;
-                    }
-
-                    if (hierarchy[node.child3 - 1] == 0)
-                        return;
-
-                    if (hierarchy[node.child3 - 1] - 1 >= data.Length)
-                    {
-                        Debug.Log("dafuq?D");
-                        return;
-                    }
-
-                    DrawNthChildBranch(data[hierarchy[node.child3 - 1] - 1]);
+                    DrawNthChildBranch(data[node.child3 - 1]);
                 }
                 break;
             case 4:
                 if (node.child4 != 0)
                 {
-                    if (node.child4 - 1 >= hierarchy.Length)
-                    {
-                        Debug.Log("dafuq?H");
-                        return;
-                    }
-
-                    if (hierarchy[node.child4 - 1] == 0)
-                        return;
-
-                    if (hierarchy[node.child4 - 1] - 1 >= data.Length)
-                    {
-                        Debug.Log("dafuq?D");
-                        return;
-                    }
-
-                    DrawNthChildBranch(data[hierarchy[node.child4 - 1] - 1]);
+                    DrawNthChildBranch(data[node.child4 - 1]);
                 }
                 break;
             case 5:
                 if (node.child5 != 0)
                 {
-                    if (node.child5 - 1 >= hierarchy.Length)
-                    {
-                        Debug.Log("dafuq?H");
-                        return;
-                    }
-
-                    if (hierarchy[node.child5 - 1] == 0)
-                        return;
-
-                    if (hierarchy[node.child5 - 1] - 1 >= data.Length)
-                    {
-                        Debug.Log("dafuq?D");
-                        return;
-                    }
-
-                    DrawNthChildBranch(data[hierarchy[node.child5 - 1] - 1]);
+                    DrawNthChildBranch(data[node.child5 - 1]);
                 }
                 break;
             case 6:
                 if (node.child6 != 0)
                 {
-                    if (node.child6 - 1 >= hierarchy.Length)
-                    {
-                        Debug.Log("dafuq?H");
-                        return;
-                    }
-
-                    if (hierarchy[node.child6 - 1] == 0)
-                        return;
-
-                    if (hierarchy[node.child6 - 1] - 1 >= data.Length)
-                    {
-                        Debug.Log("dafuq?D");
-                        return;
-                    }
-
-                    DrawNthChildBranch(data[hierarchy[node.child6 - 1] - 1]);
+                    DrawNthChildBranch(data[node.child6 - 1]);
                 }
                 break;
             case 7:
                 if (node.child7 != 0)
                 {
-                    if (node.child7 - 1 >= hierarchy.Length)
-                    {
-                        Debug.Log("dafuq?H");
-                        return;
-                    }
-
-                    if (hierarchy[node.child7 - 1] == 0)
-                        return;
-
-                    if (hierarchy[node.child7 - 1] - 1 >= data.Length)
-                    {
-                        Debug.Log("dafuq?D");
-                        return;
-                    }
-
-                    DrawNthChildBranch(data[hierarchy[node.child7 - 1] - 1]);
+                    DrawNthChildBranch(data[node.child7 - 1]);
                 }
                 break;
         }
