@@ -56,7 +56,7 @@ public class Voxelizer : MonoBehaviour
     [HideInInspector]
     public TreeNode[] data;
     [HideInInspector]
-    public node_ptr[] hierarchy;
+    public int dataCount;
     [HideInInspector]
     public uint root;
     int nodeCount;
@@ -88,6 +88,11 @@ public class Voxelizer : MonoBehaviour
     {
         if (G >= generationCount)
             G = generationCount;
+
+        octreeBufferSize = 0;
+        indexBufferSize = 0;
+        triangleBufferSize = 0;
+        hierarchyBufferSize = 0;
     }
 
     uint maxNodes(uint generation)
@@ -105,54 +110,94 @@ public class Voxelizer : MonoBehaviour
         method.Invoke(new object(), null);
     }
 
+    ComputeBuffer octree;
+    int octreeBufferSize = 0;
+    ComputeBuffer indexBuffer;
+    int indexBufferSize = 0;
+    ComputeBuffer triangleBuffer;
+    int triangleBufferSize = 0;
+    ComputeBuffer hierarchyBuffer;
+    int hierarchyBufferSize = 0;
+    ComputeBuffer countBuffer;
+    List<triangle_ptr> indices = new List<triangle_ptr>();
+
+    private void Update()
+    {
+        Voxelize();
+    }
+
     public void Voxelize()
     {
+        //Stopwatch clock = new Stopwatch();
+
+        //clock.Start();
+
         if (resolution == 0)
             return;
 
-        model = meshFilter.sharedMesh;
         if (model == null)
-            return;
+        {
+            model = meshFilter.sharedMesh;
+            if (model == null)
+                return;
+        }
 
-        ClearLog();
+        //ClearLog();
         generationCount = 0;
         triangles.Clear();
+        indices.Clear();
 
         maxExtend = Mathf.Max(model.bounds.extents.x, model.bounds.extents.y, model.bounds.extents.z);
         float voxelSize = (maxExtend * 2f) / resolution;
-
         uint maxVoxelCount = (resolution + 1) * (resolution + 1) * (resolution + 1);
 
-        Debug.Log("voxel size: " + voxelSize + ", max size: " + (maxExtend * 2f) + ", max voxel count: " + maxVoxelCount);
+        //Debug.Log("voxel size: " + voxelSize + ", max size: " + (maxExtend * 2f) + ", max voxel count: " + maxVoxelCount);
 
-        List<triangle_ptr> indices = new List<triangle_ptr>();
+        #region Convert this to a shader as well
         for (uint i = 0; i < model.triangles.Length; i += 3)
         {
             indices.Add(i / 3);
             triangles.Add(new tripoly(meshFilter.transform.localToWorldMatrix * model.vertices[model.triangles[i]], meshFilter.transform.localToWorldMatrix * model.vertices[model.triangles[i + 1]], meshFilter.transform.localToWorldMatrix * model.vertices[model.triangles[i + 2]]));
         }
+        #endregion
 
         uint triangleCount = (uint)(triangles.Count);
         uint minGenerationCount = (uint)Mathf.RoundToInt(Mathf.Log(maxVoxelCount) / Mathf.Log(8f));
 
         int nodeAllocationCount = (int)maxNodes(minGenerationCount);
 
-        ComputeBuffer octree = new ComputeBuffer(nodeAllocationCount, sizeof(float) * 4 + sizeof(uint) * 12, ComputeBufferType.Counter);
+        if (octreeBufferSize < nodeAllocationCount)
+        {
+            octreeBufferSize = nodeAllocationCount;
+            octree = new ComputeBuffer(nodeAllocationCount, sizeof(float) * 4 + sizeof(uint) * 12, ComputeBufferType.Counter);
+            Debug.Log("octree buffer resize.");
+        }
         octree.SetCounterValue(0);
 
-        Debug.Log("triangle count: " + triangleCount);
-        Debug.Log("minimum generations: " + minGenerationCount);
-        Debug.Log("allocated memory for " + nodeAllocationCount + " nodes.");
+        //Debug.Log("triangle count: " + triangleCount);
 
-        ComputeBuffer indexBuffer = new ComputeBuffer((int)triangleCount, sizeof(uint), ComputeBufferType.Structured);
+        if (indexBufferSize < triangleCount)
+        {
+            indexBufferSize = (int)triangleCount;
+            indexBuffer = new ComputeBuffer((int)triangleCount, sizeof(uint), ComputeBufferType.Structured);
+            Debug.Log("index buffer resize.");
+        }
         indexBuffer.SetData(indices);
 
-        ComputeBuffer triangleBuffer = new ComputeBuffer((int)triangleCount, sizeof(float) * 9, ComputeBufferType.Structured);
+        if (triangleBufferSize < triangleCount)
+        {
+            triangleBufferSize = (int)triangleCount;
+            triangleBuffer = new ComputeBuffer((int)triangleCount, sizeof(float) * 9, ComputeBufferType.Structured);
+            Debug.Log("triangle buffer resize.");
+        }
         triangleBuffer.SetData(triangles);
 
-        ComputeBuffer hierarchyBuffer = new ComputeBuffer(nodeAllocationCount, sizeof(uint), ComputeBufferType.Structured);
-        hierarchy = new uint[nodeAllocationCount];
-        hierarchyBuffer.SetData(hierarchy);
+        if (hierarchyBufferSize < nodeAllocationCount)
+        {
+            hierarchyBufferSize = nodeAllocationCount;
+            hierarchyBuffer = new ComputeBuffer(nodeAllocationCount, sizeof(uint), ComputeBufferType.Structured);
+            Debug.Log("hierarchy buffer resize.");
+        }
 
         int voxelKernel = voxelizeShader.FindKernel("CSMain");
         voxelizeShader.SetBuffer(voxelKernel, "octree", octree);
@@ -167,33 +212,38 @@ public class Voxelizer : MonoBehaviour
         uint temp;
         voxelizeShader.GetKernelThreadGroupSizes(voxelKernel, out threadCount, out temp, out temp);
         int groupCount = Mathf.CeilToInt((float)maxVoxelCount / threadCount);
-        Debug.Log("group count: " + groupCount + ", thread count: " + threadCount);
+        //Debug.Log("group count: " + groupCount + ", thread count: " + threadCount);
 
-        Stopwatch clock = new Stopwatch();
-
-        clock.Start();
         voxelizeShader.Dispatch(voxelKernel, groupCount, 1, 1);
-        System.TimeSpan elapsed = clock.Elapsed;
-        clock.Stop();
-        Debug.Log("voxelization took: " + elapsed.TotalMilliseconds + "ms");
 
-        hierarchyBuffer.GetData(hierarchy);
-
-
-        var countBuffer = new ComputeBuffer(1, sizeof(int), ComputeBufferType.IndirectArguments);
-
+        if (countBuffer == null)
+            countBuffer = new ComputeBuffer(1, sizeof(int), ComputeBufferType.IndirectArguments);
         // Copy the count.
+        countBuffer.SetCounterValue(0);
         ComputeBuffer.CopyCount(octree, countBuffer, 0);
 
         // Retrieve it into array.
         int[] counter = new int[1] { 0 };
         countBuffer.GetData(counter);
+        // countBuffer.Release();
 
-        Debug.Log("generated " + counter[0] + " nodes.");
+        //Debug.Log("generated " + counter[0] + " nodes.");
         nodeCount = counter[0];
 
-        data = new TreeNode[counter[0]];
+        if (data == null || data.Length < counter[0])
+            data = new TreeNode[counter[0]];
         octree.GetData(data);
+
+        //hierarchyBuffer.Dispose();
+        // hierarchyBuffer.Release();
+        // triangleBuffer.Release();
+        //indexBuffer.Release();
+        //octree.Dispose();
+        //octree.Release();
+
+        //System.TimeSpan elapsed = clock.Elapsed;
+        //clock.Stop();
+        //Debug.Log("voxelization took: " + elapsed.TotalMilliseconds + "ms");
     }
 
     private void OnDrawGizmos()
@@ -213,7 +263,7 @@ public class Voxelizer : MonoBehaviour
         {
             float extend = -1;
 
-            for (int i = 0; i < data.Length; i++)
+            for (int i = 0; i < dataCount; i++)
             {
                 if (data[i].extends != 0 && extend != data[i].extends)
                 {
@@ -244,7 +294,7 @@ public class Voxelizer : MonoBehaviour
 
             int generation = -1;
             extend = -1;
-            for (int i = 0; i < data.Length; i++)
+            for (int i = 0; i < dataCount; i++)
             {
                 if (extend != data[i].extends)
                 {
@@ -351,15 +401,15 @@ public class Voxelizer : MonoBehaviour
                 DrawNthChildBranch(data[root]);
         }
 
-        if (generationCount != oldGenerationCount)
-        {
-            Debug.Log("generated " + (generationCount + 1) + " generations");
-            int gen = 0;
-            foreach (float size in sizes)
-            {
-                Debug.Log("generation " + gen++ + " has size " + size);
-            }
-        }
+        //if (generationCount != oldGenerationCount)
+        //{
+        //    Debug.Log("generated " + (generationCount + 1) + " generations");
+        //    int gen = 0;
+        //    foreach (float size in sizes)
+        //    {
+        //        Debug.Log("generation " + gen++ + " has size " + size);
+        //    }
+        //}
     }
 
     void DrawNthChildBranch(TreeNode node)

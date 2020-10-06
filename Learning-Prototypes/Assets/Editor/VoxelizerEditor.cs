@@ -1,11 +1,11 @@
 ﻿using UnityEngine;
 using UnityEditor;
+using System.Reflection;
 
 [CustomEditor(typeof(Voxelizer))]
 public class VoxelizerEditor : Editor
 {
-    bool rotate = false;
-    float rotationSpeed = 1f;
+    bool coninuousRevoxelisation = false;
     public override void OnInspectorGUI()
     {
         base.OnInspectorGUI();
@@ -27,14 +27,7 @@ public class VoxelizerEditor : Editor
             SceneView.RepaintAll();
         }
 
-        rotationSpeed = EditorGUILayout.FloatField("Rotation Speed", rotationSpeed);
-
-        bool newRotate = GUILayout.Toggle(rotate, "Rotate");
-        if(newRotate != rotate)
-        {
-            rotate = newRotate;
-            SceneView.RepaintAll();
-        }
+        coninuousRevoxelisation = GUILayout.Toggle(coninuousRevoxelisation, "Revoxelize continuously");
     }
 
     private void OnEnable()
@@ -42,6 +35,10 @@ public class VoxelizerEditor : Editor
         Voxelizer vox = (target as Voxelizer);
         vox.drawGizmos = true;
         vox.meshFilter.GetComponent<MeshRenderer>().enabled = true;
+
+        System.Type type = typeof(Tools);
+        FieldInfo field = type.GetField("s_Hidden", BindingFlags.NonPublic | BindingFlags.Static);
+        field.SetValue(null, true);
     }
 
     private void OnDisable()
@@ -49,20 +46,27 @@ public class VoxelizerEditor : Editor
         Voxelizer vox = (target as Voxelizer);
         vox.drawGizmos = false;
         vox.meshFilter.GetComponent<MeshRenderer>().enabled = false;
+
+        System.Type type = typeof(Tools);
+        FieldInfo field = type.GetField("s_Hidden", BindingFlags.NonPublic | BindingFlags.Static);
+        field.SetValue(null, false);
     }
 
-    public void OnSceneGUI()
+    private void OnSceneGUI()
     {
-        if (rotate)
+        if (coninuousRevoxelisation)
         {
-            Voxelizer vox = (target as Voxelizer);
-            Quaternion rot = vox.transform.rotation;
-
-            rot *= Quaternion.AngleAxis(Time.deltaTime * rotationSpeed, Vector3.up);
-
-            vox.transform.rotation = rot;
-            //vox.Voxelize();
+            (target as Voxelizer).Voxelize();
             SceneView.RepaintAll();
         }
+
+        Transform transform = (target as Voxelizer).meshFilter.transform;
+
+        if (Tools.current == Tool.Move)
+            transform.position = Handles.PositionHandle(transform.position, transform.rotation);
+        else if (Tools.current == Tool.Rotate)
+            transform.rotation = Handles.RotationHandle(transform.rotation, transform.position);
+        else if (Tools.current == Tool.Scale)
+            transform.localScale = Handles.ScaleHandle(transform.localScale, transform.position, transform.rotation, HandleUtility.GetHandleSize(transform.position));
     }
 }

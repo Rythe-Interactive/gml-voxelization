@@ -57,7 +57,7 @@ public class Caster : MonoBehaviour
 
         if (bruteForce)
         {
-            for (int i = 0; i < voxelizer.data.Length; i++)
+            for (int i = 0; i < voxelizer.dataCount; i++)
                 TraverseTree(voxelizer.data[i], ray);
         }
         else
