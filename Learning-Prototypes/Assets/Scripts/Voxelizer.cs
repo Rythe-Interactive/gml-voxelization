@@ -62,7 +62,9 @@ public class Voxelizer : MonoBehaviour
     int nodeCount;
     float maxExtend;
     [HideInInspector]
-    public List<tripoly> triangles = new List<tripoly>();
+    public tripoly[] triangles;
+    [HideInInspector]
+    public int triangleCount;
     [HideInInspector]
     public uint generationCount = 0;
 
@@ -90,9 +92,9 @@ public class Voxelizer : MonoBehaviour
             G = generationCount;
 
         octreeBufferSize = 0;
-        indexBufferSize = 0;
         triangleBufferSize = 0;
         hierarchyBufferSize = 0;
+        triangleCount = 0;
     }
 
     uint maxNodes(uint generation)
@@ -112,14 +114,11 @@ public class Voxelizer : MonoBehaviour
 
     ComputeBuffer octree;
     int octreeBufferSize = 0;
-    ComputeBuffer indexBuffer;
-    int indexBufferSize = 0;
     ComputeBuffer triangleBuffer;
     int triangleBufferSize = 0;
     ComputeBuffer hierarchyBuffer;
     int hierarchyBufferSize = 0;
     ComputeBuffer countBuffer;
-    List<triangle_ptr> indices = new List<triangle_ptr>();
 
     private void Update()
     {
@@ -128,9 +127,9 @@ public class Voxelizer : MonoBehaviour
 
     public void Voxelize()
     {
-        //Stopwatch clock = new Stopwatch();
+        Stopwatch clock = new Stopwatch();
 
-        //clock.Start();
+        clock.Start();
 
         if (resolution == 0)
             return;
@@ -142,26 +141,38 @@ public class Voxelizer : MonoBehaviour
                 return;
         }
 
-        //ClearLog();
         generationCount = 0;
-        triangles.Clear();
-        indices.Clear();
 
         maxExtend = Mathf.Max(model.bounds.extents.x, model.bounds.extents.y, model.bounds.extents.z);
         float voxelSize = (maxExtend * 2f) / resolution;
         uint maxVoxelCount = (resolution + 1) * (resolution + 1) * (resolution + 1);
 
-        //Debug.Log("voxel size: " + voxelSize + ", max size: " + (maxExtend * 2f) + ", max voxel count: " + maxVoxelCount);
+        if (triangleCount < model.triangles.Length / 3)
+            triangles = new tripoly[model.triangles.Length / 3];
+        triangleCount = model.triangles.Length / 3;
 
-        #region Convert this to a shader as well
-        for (uint i = 0; i < model.triangles.Length; i += 3)
+        if (triangleBufferSize < triangleCount)
         {
-            indices.Add(i / 3);
-            triangles.Add(new tripoly(meshFilter.transform.localToWorldMatrix * model.vertices[model.triangles[i]], meshFilter.transform.localToWorldMatrix * model.vertices[model.triangles[i + 1]], meshFilter.transform.localToWorldMatrix * model.vertices[model.triangles[i + 2]]));
+            triangleBufferSize = (int)triangleCount;
+            triangleBuffer = new ComputeBuffer(triangleCount, sizeof(float) * 9, ComputeBufferType.Structured);
+            Debug.Log("triangle buffer resize.");
         }
-        #endregion
 
-        uint triangleCount = (uint)(triangles.Count);
+        ComputeBuffer indexBuffer = new ComputeBuffer(model.triangles.Length, sizeof(int), ComputeBufferType.Structured);
+        indexBuffer.SetData(model.triangles);
+        ComputeBuffer vertexBuffer = new ComputeBuffer(model.vertices.Length, sizeof(float) * 3, ComputeBufferType.Structured);
+        vertexBuffer.SetData(model.vertices);
+
+        int processMeshKernel = voxelizeShader.FindKernel("ProcessMesh");
+        voxelizeShader.SetBuffer(processMeshKernel, "triangles", triangleBuffer);
+        voxelizeShader.SetMatrix("modelmatrix", meshFilter.transform.localToWorldMatrix);
+        voxelizeShader.SetInt("triangleCount", triangleCount);
+
+        voxelizeShader.SetBuffer(processMeshKernel, "indices", indexBuffer);
+        voxelizeShader.SetBuffer(processMeshKernel, "vertices", vertexBuffer);
+
+        voxelizeShader.Dispatch(processMeshKernel, Mathf.RoundToInt(triangleCount / 1024f), 1, 1);
+
         uint minGenerationCount = (uint)Mathf.RoundToInt(Mathf.Log(maxVoxelCount) / Mathf.Log(8f));
 
         int nodeAllocationCount = (int)maxNodes(minGenerationCount);
@@ -174,45 +185,25 @@ public class Voxelizer : MonoBehaviour
         }
         octree.SetCounterValue(0);
 
-        //Debug.Log("triangle count: " + triangleCount);
-
-        if (indexBufferSize < triangleCount)
-        {
-            indexBufferSize = (int)triangleCount;
-            indexBuffer = new ComputeBuffer((int)triangleCount, sizeof(uint), ComputeBufferType.Structured);
-            Debug.Log("index buffer resize.");
-        }
-        indexBuffer.SetData(indices);
-
-        if (triangleBufferSize < triangleCount)
-        {
-            triangleBufferSize = (int)triangleCount;
-            triangleBuffer = new ComputeBuffer((int)triangleCount, sizeof(float) * 9, ComputeBufferType.Structured);
-            Debug.Log("triangle buffer resize.");
-        }
-        triangleBuffer.SetData(triangles);
-
         if (hierarchyBufferSize < nodeAllocationCount)
         {
             hierarchyBufferSize = nodeAllocationCount;
             hierarchyBuffer = new ComputeBuffer(nodeAllocationCount, sizeof(uint), ComputeBufferType.Structured);
             Debug.Log("hierarchy buffer resize.");
         }
+        hierarchyBuffer.SetData(new uint[nodeAllocationCount]);
 
-        int voxelKernel = voxelizeShader.FindKernel("CSMain");
+        int voxelKernel = voxelizeShader.FindKernel("Voxelize");
         voxelizeShader.SetBuffer(voxelKernel, "octree", octree);
-        voxelizeShader.SetBuffer(voxelKernel, "triangleIndeces", indexBuffer);
         voxelizeShader.SetBuffer(voxelKernel, "triangles", triangleBuffer);
         voxelizeShader.SetBuffer(voxelKernel, "hierarchy", hierarchyBuffer);
         voxelizeShader.SetInt("resolution", (int)resolution);
         voxelizeShader.SetFloat("voxelSize", voxelSize);
-        voxelizeShader.SetInt("triangleCount", (int)triangleCount);
 
         uint threadCount;
         uint temp;
         voxelizeShader.GetKernelThreadGroupSizes(voxelKernel, out threadCount, out temp, out temp);
         int groupCount = Mathf.CeilToInt((float)maxVoxelCount / threadCount);
-        //Debug.Log("group count: " + groupCount + ", thread count: " + threadCount);
 
         voxelizeShader.Dispatch(voxelKernel, groupCount, 1, 1);
 
@@ -227,13 +218,12 @@ public class Voxelizer : MonoBehaviour
         countBuffer.GetData(counter);
         // countBuffer.Release();
 
-        //Debug.Log("generated " + counter[0] + " nodes.");
         nodeCount = counter[0];
 
         if (data == null || data.Length < counter[0])
             data = new TreeNode[counter[0]];
         octree.GetData(data);
-
+        dataCount = counter[0];
         //hierarchyBuffer.Dispose();
         // hierarchyBuffer.Release();
         // triangleBuffer.Release();
@@ -241,8 +231,8 @@ public class Voxelizer : MonoBehaviour
         //octree.Dispose();
         //octree.Release();
 
-        //System.TimeSpan elapsed = clock.Elapsed;
-        //clock.Stop();
+        System.TimeSpan elapsed = clock.Elapsed;
+        clock.Stop();
         //Debug.Log("voxelization took: " + elapsed.TotalMilliseconds + "ms");
     }
 
@@ -312,7 +302,7 @@ public class Voxelizer : MonoBehaviour
                     int idx = (int)data[i].triangle0 - 1;
 
                     if (drawTriangles)
-                        if (idx >= triangles.Count)
+                        if (idx >= triangleCount)
                         {
                             Debug.Log(idx);
                             data[i].triangle0 = 0;
@@ -331,7 +321,7 @@ public class Voxelizer : MonoBehaviour
                     int idx = (int)data[i].triangle1 - 1;
 
                     if (drawTriangles)
-                        if (idx >= triangles.Count)
+                        if (idx >= triangleCount)
                         {
                             Debug.Log(idx);
                             data[i].triangle1 = 0;
@@ -350,7 +340,7 @@ public class Voxelizer : MonoBehaviour
                     int idx = (int)data[i].triangle2 - 1;
 
                     if (drawTriangles)
-                        if (idx >= triangles.Count)
+                        if (idx >= triangleCount)
                         {
                             Debug.Log(idx);
                             data[i].triangle2 = 0;
@@ -369,7 +359,7 @@ public class Voxelizer : MonoBehaviour
                     int idx = (int)data[i].triangle3 - 1;
 
                     if (drawTriangles)
-                        if (idx >= triangles.Count)
+                        if (idx >= triangleCount)
                         {
                             Debug.Log(idx);
                             data[i].triangle3 = 0;
@@ -393,7 +383,10 @@ public class Voxelizer : MonoBehaviour
 
                 if (drawNodes)
                 {
-                    Gizmos.DrawWireCube(data[i].origin, new Vector3(data[i].extends, data[i].extends, data[i].extends) * 2f);
+                    if(drawGthGenerationOnly)
+                        Gizmos.DrawCube(data[i].origin, new Vector3(data[i].extends, data[i].extends, data[i].extends) * 2f);
+                    else
+                        Gizmos.DrawWireCube(data[i].origin, new Vector3(data[i].extends, data[i].extends, data[i].extends) * 2f);
                 }
             }
 

@@ -21,7 +21,9 @@ public class VoxelizerEditor : Editor
             Voxelizer vox = (target as Voxelizer);
             vox.ClearLog();
             vox.generationCount = 0;
-            vox.triangles.Clear();
+            vox.triangleCount = 0;
+            vox.triangles = null;
+            vox.dataCount = 0;
             vox.data = null;
 
             SceneView.RepaintAll();

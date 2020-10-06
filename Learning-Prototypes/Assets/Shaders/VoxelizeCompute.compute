@@ -1,5 +1,6 @@
 ﻿// Each #kernel tells which function to compile; you can have many kernels
-#pragma kernel CSMain
+#pragma kernel ProcessMesh
+#pragma kernel Voxelize
 
 typedef uint triangle_ptr;
 typedef uint node_ptr;
@@ -17,13 +18,31 @@ struct TreeNode
 
 #include "Assets/Shaders/Intersection.compute"
 
+RWStructuredBuffer<tripoly> triangles;
+uint triangleCount;
+float4x4 modelmatrix;
+StructuredBuffer<int> indices;
+StructuredBuffer<float3> vertices;
+
+[numthreads(1024, 1, 1)]
+void ProcessMesh(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
+{
+	if (id.x > triangleCount)
+		return;
+
+	uint triIdx = id.x * 3;
+	tripoly tri;
+
+	tri.v[0] = mul(modelmatrix, float4(vertices[indices[triIdx + 0]], 1)).xyz;
+	tri.v[1] = mul(modelmatrix, float4(vertices[indices[triIdx + 1]], 1)).xyz;
+	tri.v[2] = mul(modelmatrix, float4(vertices[indices[triIdx + 2]], 1)).xyz;
+	triangles[id.x] = tri;
+}
+
 RWStructuredBuffer<TreeNode> octree;
 RWStructuredBuffer<uint> hierarchy;
-StructuredBuffer<uint> triangleIndeces;
-StructuredBuffer<tripoly> triangles;
 uint resolution;
 float voxelSize;
-uint triangleCount;
 
 uint Idx3ToIdx(uint3 idx3, uint res)
 {
@@ -36,7 +55,7 @@ uint3 IdxToIdx3(uint idx, uint res)
 }
 
 [numthreads(1024, 1, 1)]
-void CSMain(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
+void Voxelize(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
 {
 	const uint idx = id.x;
 
