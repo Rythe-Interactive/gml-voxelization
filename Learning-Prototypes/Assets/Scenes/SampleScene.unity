@@ -198,18 +198,18 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   meshFilter: {fileID: 1936533451}
   voxelizeShader: {fileID: 7200000, guid: c8408d2f494ff6a4ab96366bedb31ae0, type: 3}
-  resolution: 128
+  resolution: 64
   drawTriangles: 0
-  drawNodes: 0
+  drawNodes: 1
   G: 0
   drawGthGenerationOnly: 0
   N: 0
   drawNthChild: 0
-  dataCount: 187
+  dataCount: 0
   root: 0
   triangleCount: 0
-  generationCount: 3
-  drawGizmos: 0
+  generationCount: 0
+  drawGizmos: 1
 --- !u!1 &304716434
 GameObject:
   m_ObjectHideFlags: 0
@@ -241,11 +241,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   voxelizer: {fileID: 98183674}
   transformer: {fileID: 294031}
-  draw: 0
+  draw: 1
   bruteForce: 0
   G: 0
   drawGthGenerationOnly: 0
-  drawGizmos: 1
+  drawGizmos: 0
 --- !u!4 &304716436
 Transform:
   m_ObjectHideFlags: 0
@@ -489,7 +489,7 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1936533448}
-  m_LocalRotation: {x: 0, y: -0.44132844, z: 0, w: 0.89734566}
+  m_LocalRotation: {x: -0.80815846, y: -0.305657, z: -0.50061893, w: -0.0532398}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
@@ -503,7 +503,7 @@ MeshRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1936533448}
-  m_Enabled: 0
+  m_Enabled: 1
   m_CastShadows: 1
   m_ReceiveShadows: 1
   m_DynamicOccludee: 1
@@ -619,7 +619,7 @@ Light:
   m_BounceIntensity: 1
   m_ColorTemperature: 6570
   m_UseColorTemperature: 0
-  m_BoundingSphereOverride: {x: 0, y: 5.9112e-41, z: 0, w: -9.8125}
+  m_BoundingSphereOverride: {x: 0, y: 1.0835e-41, z: 0, w: 0}
   m_UseBoundingSphereOverride: 0
   m_ShadowRadius: 0
   m_ShadowAngle: 0

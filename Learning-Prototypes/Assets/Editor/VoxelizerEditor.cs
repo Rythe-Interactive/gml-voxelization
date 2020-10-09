@@ -25,7 +25,7 @@ public class VoxelizerEditor : Editor
             vox.triangles = null;
             vox.dataCount = 0;
             vox.data = null;
-
+            
             SceneView.RepaintAll();
         }
 
@@ -59,7 +59,7 @@ public class VoxelizerEditor : Editor
         if (coninuousRevoxelisation)
         {
             (target as Voxelizer).Voxelize();
-            SceneView.RepaintAll();
+            HandleUtility.Repaint();
         }
 
         Transform transform = (target as Voxelizer).meshFilter.transform;
