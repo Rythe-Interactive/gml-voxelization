@@ -3,7 +3,7 @@
 	Properties
 	{
 		_LineColor("Line color", Color) = (1.0, 1.0, 1.0, 1.0)
-		_LineWidth("Line width", Range(0.1, 10.0)) = 1.0
+		_LineWidth("Line width", Range(0.0001, 10.0)) = 1.0
 		_DrawFaces("Draw faces", Range(0, 1)) = 1
 	}
 

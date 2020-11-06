@@ -19,6 +19,7 @@ public class Voxelizer : MonoBehaviour
     [Range(0, 7)]
     public uint N;
     public bool drawNthChild;
+    public bool animate;
 
     public struct tripoly
     {
@@ -51,15 +52,14 @@ public class Voxelizer : MonoBehaviour
         public node_ptr child6;
         public node_ptr child7;
     };
-
-    Mesh model;
+    [HideInInspector]
+    public Mesh model;
     [HideInInspector]
     public TreeNode[] data;
     [HideInInspector]
     public int dataCount;
     [HideInInspector]
     public uint root;
-    int nodeCount;
     float maxExtend;
     [HideInInspector]
     public tripoly[] triangles;
@@ -86,7 +86,7 @@ public class Voxelizer : MonoBehaviour
         return new Vector3Int(idx % res, idx / (res * res), (idx / res) % res);
     }
 
-    private void OnValidate()
+    public void OnValidate()
     {
         if (G >= generationCount)
             G = generationCount;
@@ -97,6 +97,14 @@ public class Voxelizer : MonoBehaviour
         indexBufferSize = 0;
         vertexBufferSize = 0;
         triangleCount = 0;
+
+        model = meshFilter.sharedMesh;
+
+        if (model == null)
+            return;
+
+        if (originalvertices == null)
+            originalvertices = model.vertices;
     }
 
     uint maxNodes(uint generation)
@@ -122,14 +130,15 @@ public class Voxelizer : MonoBehaviour
     int hierarchyBufferSize = 0;
     ComputeBuffer countBuffer;
 
+    Vector3[] vertices;
+    Vector3[] originalvertices;
+
     ComputeBuffer indexBuffer;
     int indexBufferSize = 0;
     ComputeBuffer vertexBuffer;
     int vertexBufferSize = 0;
 
-    Stopwatch clock = new Stopwatch();
-    Stopwatch GPUclock = new Stopwatch();
-    int[] counter = new int[1] { 0 };
+    uint[] counter = new uint[1] { 0 };
 
     private void Update()
     {
@@ -138,23 +147,16 @@ public class Voxelizer : MonoBehaviour
 
     public void Voxelize()
     {
-        clock.Restart();
-
         if (resolution == 0)
             return;
 
         if (model == null)
-        {
             model = meshFilter.sharedMesh;
-            if (model == null)
-                return;
-        }
+
+        if (model == null)
+            return;
 
         generationCount = 0;
-
-        maxExtend = Mathf.Max(model.bounds.extents.x, model.bounds.extents.y, model.bounds.extents.z);
-        float voxelSize = (maxExtend * 2f) / resolution;
-        uint maxVoxelCount = (resolution + 1) * (resolution + 1) * (resolution + 1);
 
         if (triangleCount < model.triangles.Length / 3)
             triangles = new tripoly[model.triangles.Length / 3];
@@ -182,28 +184,53 @@ public class Voxelizer : MonoBehaviour
         }
         indexBuffer.SetData(model.triangles);
 
-        if (vertexBufferSize < model.vertices.Length)
+        if (vertexBufferSize < originalvertices.Length)
         {
-            vertexBufferSize = model.vertices.Length;
+            vertexBufferSize = originalvertices.Length;
 
             if (vertexBuffer != null)
                 vertexBuffer.Dispose();
 
-            vertexBuffer = new ComputeBuffer(model.vertices.Length, sizeof(float) * 3, ComputeBufferType.Structured);
+            vertexBuffer = new ComputeBuffer(originalvertices.Length, sizeof(float) * 3, ComputeBufferType.Structured);
         }
-        vertexBuffer.SetData(model.vertices);
+        vertexBuffer.SetData(originalvertices);
 
         int processMeshKernel = voxelizeShader.FindKernel("ProcessMesh");
         voxelizeShader.SetBuffer(processMeshKernel, "triangles", triangleBuffer);
         voxelizeShader.SetMatrix("modelmatrix", meshFilter.transform.localToWorldMatrix);
         voxelizeShader.SetInt("triangleCount", triangleCount);
+        voxelizeShader.SetFloat("time", Time.time);
+        voxelizeShader.SetBool("animate", animate);
 
         voxelizeShader.SetBuffer(processMeshKernel, "indices", indexBuffer);
         voxelizeShader.SetBuffer(processMeshKernel, "vertices", vertexBuffer);
 
-        GPUclock.Restart();
         voxelizeShader.Dispatch(processMeshKernel, Mathf.RoundToInt(triangleCount / 1024f), 1, 1);
-        GPUclock.Stop();
+
+        if (vertices == null || vertices.Length < vertexBufferSize)
+            vertices = new Vector3[vertexBufferSize];
+
+        vertexBuffer.GetData(vertices);
+        Vector3 size = new Vector3(0, 0, 0);
+        for (int i = 0; i < vertices.Length; i++)
+        {
+            size.x = Mathf.Max(size.x, Mathf.Abs(vertices[i].x));
+            size.y = Mathf.Max(size.y, Mathf.Abs(vertices[i].y));
+            size.z = Mathf.Max(size.z, Mathf.Abs(vertices[i].z));
+        }
+
+        //if (Application.isPlaying)
+        //{
+        //    meshFilter.mesh.vertices = vertices;
+        //    meshFilter.mesh.bounds = new Bounds(new Vector3(0, 0, 0), size * 2f);
+        //    meshFilter.mesh.UploadMeshData(false);
+        //    meshFilter.mesh.MarkModified();
+        //}
+
+        maxExtend = Mathf.Max(size.x, size.y, size.z);
+        float voxelSize = (maxExtend * 2f) / resolution;
+        uint maxVoxelCount = (resolution + 1) * (resolution + 1) * (resolution + 1);
+
         uint minGenerationCount = (uint)Mathf.RoundToInt(Mathf.Log(maxVoxelCount) / Mathf.Log(8f));
 
         int nodeAllocationCount = (int)maxNodes(minGenerationCount);
@@ -244,31 +271,27 @@ public class Voxelizer : MonoBehaviour
         voxelizeShader.GetKernelThreadGroupSizes(voxelKernel, out threadCount, out temp, out temp);
         int groupCount = Mathf.CeilToInt((float)maxVoxelCount / threadCount);
 
-        GPUclock.Start();
+
         voxelizeShader.Dispatch(voxelKernel, groupCount, 1, 1);
-        GPUclock.Stop();
 
         if (countBuffer == null)
-            countBuffer = new ComputeBuffer(1, sizeof(int), ComputeBufferType.IndirectArguments);
-        // Copy the count.
-        countBuffer.SetCounterValue(0);
-        ComputeBuffer.CopyCount(octree, countBuffer, 0);
+        {
+            countBuffer = new ComputeBuffer(1, sizeof(uint), ComputeBufferType.Raw);
+            countBuffer.SetCounterValue(1);
+        }
 
+        // Copy the count.
+        ComputeBuffer.CopyCount(octree, countBuffer, 0);
         // Retrieve it into array.
         countBuffer.GetData(counter);
 
-        nodeCount = counter[0];
-
         if (data == null || data.Length < counter[0])
+        {
+            Debug.Log("data array resize.");
             data = new TreeNode[counter[0]];
-        octree.GetData(data);
-        dataCount = counter[0];
-
-        clock.Stop();
-        System.TimeSpan elapsed = clock.Elapsed;
-        System.TimeSpan GPUelapsed = GPUclock.Elapsed;
-
-        Debug.Log("Voxelization took " + elapsed.TotalMilliseconds + "ms total with " + GPUelapsed.TotalMilliseconds + "ms of GPU time.");
+        }
+        octree.GetData(data, 0, 0, (int)counter[0]);
+        dataCount = (int)counter[0];
     }
 
     private void OnDrawGizmos()
@@ -286,6 +309,11 @@ public class Voxelizer : MonoBehaviour
 
         if (data != null)
         {
+            Gizmos.matrix = meshFilter.transform.localToWorldMatrix;
+
+            Gizmos.color = Color.white;
+            Gizmos.DrawWireCube(Vector3.zero, new Vector3(maxExtend, maxExtend, maxExtend) * 2f);
+
             float extend = -1;
 
             for (int i = 0; i < dataCount; i++)
@@ -409,9 +437,9 @@ public class Voxelizer : MonoBehaviour
                 }
 
                 if (hasTriangle)
-                    Gizmos.color = Color.yellow;
+                    Gizmos.color = new Color(1f, 0.92f, 0.016f, 0.2f);
                 else
-                    Gizmos.color = Color.blue;
+                    Gizmos.color = new Color(0, 0, 1, 0.2f);
 
                 if (drawGthGenerationOnly && generation != G)
                     continue;

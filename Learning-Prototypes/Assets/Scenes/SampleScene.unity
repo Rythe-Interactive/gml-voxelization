@@ -14,18 +14,18 @@ OcclusionCullingSettings:
 RenderSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 9
-  m_Fog: 1
-  m_FogColor: {r: 0.65080994, g: 0.666729, b: 0.7075472, a: 1}
+  m_Fog: 0
+  m_FogColor: {r: 0, g: 0, b: 0, a: 1}
   m_FogMode: 3
   m_FogDensity: 0.05
   m_LinearFogStart: 0
   m_LinearFogEnd: 300
-  m_AmbientSkyColor: {r: 0.018500218, g: 0.018500218, b: 0.018500218, a: 1}
+  m_AmbientSkyColor: {r: 0, g: 0, b: 0, a: 1}
   m_AmbientEquatorColor: {r: 0.114, g: 0.125, b: 0.133, a: 1}
   m_AmbientGroundColor: {r: 0.047, g: 0.043, b: 0.035, a: 1}
   m_AmbientIntensity: 1
   m_AmbientMode: 3
-  m_SubtractiveShadowColor: {r: 0.13296545, g: 0.19145328, b: 0.33962262, a: 1}
+  m_SubtractiveShadowColor: {r: 0, g: 0, b: 0, a: 1}
   m_SkyboxMaterial: {fileID: 0}
   m_HaloStrength: 0.5
   m_FlareStrength: 1
@@ -205,11 +205,13 @@ MonoBehaviour:
   drawGthGenerationOnly: 0
   N: 0
   drawNthChild: 0
-  dataCount: 0
-  root: 0
-  triangleCount: 0
-  generationCount: 0
-  drawGizmos: 1
+  animate: 1
+  model: {fileID: -2432090755550338912, guid: a66b0b170949289438d7af78d63b2528, type: 3}
+  dataCount: 11873
+  root: 3808
+  triangleCount: 968
+  generationCount: 5
+  drawGizmos: 0
 --- !u!1 &304716434
 GameObject:
   m_ObjectHideFlags: 0
@@ -240,12 +242,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   voxelizer: {fileID: 98183674}
-  transformer: {fileID: 294031}
+  transformer: {fileID: 1936533449}
   draw: 1
   bruteForce: 0
   G: 0
   drawGthGenerationOnly: 0
-  drawGizmos: 0
+  drawGizmos: 1
 --- !u!4 &304716436
 Transform:
   m_ObjectHideFlags: 0
@@ -386,7 +388,7 @@ Camera:
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
-  m_BackGroundColor: {r: 0.14509805, g: 0.14509805, b: 0.14509805, a: 0}
+  m_BackGroundColor: {r: 0, g: 0, b: 0, a: 0}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -489,13 +491,13 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1936533448}
-  m_LocalRotation: {x: -0.80815846, y: -0.305657, z: -0.50061893, w: -0.0532398}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalRotation: {x: 0, y: 0.21929744, z: 0, w: 0.97565806}
+  m_LocalPosition: {x: -0.65942955, y: 0, z: -0.27712345}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
   m_RootOrder: 5
-  m_LocalEulerAnglesHint: {x: 0, y: 6.105, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!23 &1936533450
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -503,7 +505,7 @@ MeshRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1936533448}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 1
   m_ReceiveShadows: 1
   m_DynamicOccludee: 1
@@ -619,7 +621,7 @@ Light:
   m_BounceIntensity: 1
   m_ColorTemperature: 6570
   m_UseColorTemperature: 0
-  m_BoundingSphereOverride: {x: 0, y: 1.0835e-41, z: 0, w: 0}
+  m_BoundingSphereOverride: {x: 0, y: 1.2186e-41, z: 0, w: 9.403955e-38}
   m_UseBoundingSphereOverride: 0
   m_ShadowRadius: 0
   m_ShadowAngle: 0

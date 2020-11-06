@@ -22,7 +22,9 @@ RWStructuredBuffer<tripoly> triangles;
 uint triangleCount;
 float4x4 modelmatrix;
 StructuredBuffer<int> indices;
-StructuredBuffer<float3> vertices;
+RWStructuredBuffer<float3> vertices;
+float time;
+bool animate;
 
 [numthreads(1024, 1, 1)]
 void ProcessMesh(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
@@ -33,9 +35,29 @@ void ProcessMesh(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
 	uint triIdx = id.x * 3;
 	tripoly tri;
 
-	tri.v[0] = mul(modelmatrix, float4(vertices[indices[triIdx + 0]], 1)).xyz;
-	tri.v[1] = mul(modelmatrix, float4(vertices[indices[triIdx + 1]], 1)).xyz;
-	tri.v[2] = mul(modelmatrix, float4(vertices[indices[triIdx + 2]], 1)).xyz;
+	float3 v0 = vertices[indices[triIdx + 0]];
+	float3 v1 = vertices[indices[triIdx + 1]];
+	float3 v2 = vertices[indices[triIdx + 2]];
+
+	if (animate)
+	{
+		v0 = v0 + (float3(sin(v0.x + time), sin(v0.y + time), sin(v0.z + time))*0.1f);
+		v1 = v1 + (float3(sin(v1.x + time), sin(v1.y + time), sin(v1.z + time))*0.1f);
+		v2 = v2 + (float3(sin(v2.x + time), sin(v2.y + time), sin(v2.z + time))*0.1f);
+		tri.v[0] = v0;
+		tri.v[1] = v1;
+		tri.v[2] = v2;
+		vertices[indices[triIdx + 0]] = v0;
+		vertices[indices[triIdx + 1]] = v1;
+		vertices[indices[triIdx + 2]] = v2;
+	}
+	else
+	{
+		tri.v[0] = mul(modelmatrix, float4(v0, 1)).xyz;
+		tri.v[1] = mul(modelmatrix, float4(v1, 1)).xyz;
+		tri.v[2] = mul(modelmatrix, float4(v2, 1)).xyz;
+	}
+
 	triangles[id.x] = tri;
 }
 
@@ -59,9 +81,10 @@ void Voxelize(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
 {
 	const uint idx = id.x;
 
+	// Allows the shader to fast forward through everything without effecting anything else. Also allows the use of memory barriers.
 	bool returned = false;
 
-	if (idx >= (resolution * resolution * resolution))
+	if (idx >= (resolution * resolution * resolution)) // if the index is outside the bounds escape.
 		returned = true;
 
 	uint3 idx3 = IdxToIdx3(idx, resolution);
@@ -78,7 +101,8 @@ void Voxelize(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
 
 	bool trianglesFound = false;
 	uint lastIdx = 0;
-	{
+
+	{// Get intersecting triangles.
 		for (uint i = 0; i < triangleCount; i++)
 		{
 			if (t_c_intersection(triangles[i], origin, extends))
@@ -109,18 +133,19 @@ void Voxelize(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
 		{
 			AllMemoryBarrierWithGroupSync();
 
+			//									triangles													children
 			TreeNode node = { origin, extends, { /*0*/nullptr, /*1*/nullptr, /*2*/nullptr, /*3*/nullptr }, { /*0*/nullptr, /*1*/nullptr, /*2*/nullptr, /*3*/nullptr, /*4*/nullptr, /*5*/nullptr, /*6*/nullptr, /*7*/nullptr } };
 
 			if (!returned)
 			{
-				if (generation == 0)
+				if (generation == 0) // Set triangles only for leaf nodes.
 				{
 					node.triangles[0] = triangleIndices[0];
 					node.triangles[1] = triangleIndices[1];
 					node.triangles[2] = triangleIndices[2];
 					node.triangles[3] = triangleIndices[3];
 				}
-				else
+				else // Set children only for any branch generation.
 				{
 					childIdx3 = IdxToIdx3(childIdx, childrenResolution);
 					node.children[0] = hierarchy[childTotal + Idx3ToIdx(childIdx3, childrenResolution)]; // 0, 0, 0
@@ -134,6 +159,7 @@ void Voxelize(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
 				}
 			}
 
+			// Filter out whether we are the 1st child of our parent or not.
 			uint3 subIdx3;
 			subIdx3.x = idx3.x % (uint) (floor(pow(2, generation)));
 			subIdx3.y = idx3.y % (uint) (floor(pow(2, generation)));
@@ -206,22 +232,27 @@ void Voxelize(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
 	//generationIdx3 = idx3;
 	//childIdx = 0;
 	//childIdx3;
+	//returned = false;
+
+	//if (idx >= (resolution * resolution * resolution)) // if the index is outside the bounds escape.
+	//	returned = true;
 
 	//{
 	//	for (uint generation = 0; generation < maxGenerationCount; generation++)
 	//	{
 	//		if (generation != 0)
 	//		{
-	//			TreeNode node = octree[hierarchy[generationalIdx] - 1];
-	//			node.children[0] = hierarchy[childIdx]; // 0, 0, 0
-	//			node.children[1] = hierarchy[Idx3ToIdx(childIdx3 + uint3(1, 0, 0), childrenResolution)]; // 1, 0, 0
-	//			node.children[2] = hierarchy[Idx3ToIdx(childIdx3 + uint3(1, 0, 1), childrenResolution)]; // 1, 0, 1
-	//			node.children[3] = hierarchy[Idx3ToIdx(childIdx3 + uint3(0, 0, 1), childrenResolution)]; // 0, 0, 1
-	//			node.children[4] = hierarchy[Idx3ToIdx(childIdx3 + uint3(0, 1, 0), childrenResolution)]; // 0, 1, 0
-	//			node.children[5] = hierarchy[Idx3ToIdx(childIdx3 + uint3(1, 1, 0), childrenResolution)]; // 1, 1, 0
-	//			node.children[6] = hierarchy[Idx3ToIdx(childIdx3 + uint3(1, 1, 1), childrenResolution)]; // 1, 1, 1
-	//			node.children[7] = hierarchy[Idx3ToIdx(childIdx3 + uint3(0, 1, 1), childrenResolution)]; // 0, 1, 1
-	//			octree[hierarchy[generationalIdx] - 1] = node;
+	//			TreeNode node = octree[hierarchy[totalNodes + generationalIdx] - 1];
+	//			childIdx3 = IdxToIdx3(childIdx, childrenResolution);
+	//			node.children[0] = hierarchy[childTotal + Idx3ToIdx(childIdx3, childrenResolution)]; // 0, 0, 0
+	//			node.children[1] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(1, 0, 0), childrenResolution)]; // 1, 0, 0
+	//			node.children[2] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(1, 0, 1), childrenResolution)]; // 1, 0, 1
+	//			node.children[3] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(0, 0, 1), childrenResolution)]; // 0, 0, 1
+	//			node.children[4] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(0, 1, 0), childrenResolution)]; // 0, 1, 0
+	//			node.children[5] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(1, 1, 0), childrenResolution)]; // 1, 1, 0
+	//			node.children[6] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(1, 1, 1), childrenResolution)]; // 1, 1, 1
+	//			node.children[7] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(0, 1, 1), childrenResolution)]; // 0, 1, 1
+	//			octree[hierarchy[totalNodes + generationalIdx] - 1] = node;
 	//		}
 
 	//		uint3 subIdx3;
@@ -230,13 +261,42 @@ void Voxelize(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
 	//		subIdx3.z = idx3.z % (uint) (floor(pow(2, generation)));
 	//		if (subIdx3.x != 0 || subIdx3.y != 0 || subIdx3.z != 0)
 	//		{
-	//			break;
+	//			returned = true;
 	//		}
 
 	//		uint3 parentIdx3 = floor(generationIdx3 / 2.f);
 
+	//		if (!returned)
+	//		{
+	//			if (generation == 0)
+	//			{
+	//				
+	//			}
+	//			else
+	//			{
+	//				bool hasChildren = true;
+	//				hasChildren = hasChildren || (node.children[0] != nullptr);
+	//				hasChildren = hasChildren || (node.children[1] != nullptr);
+	//				hasChildren = hasChildren || (node.children[2] != nullptr);
+	//				hasChildren = hasChildren || (node.children[3] != nullptr);
+	//				hasChildren = hasChildren || (node.children[4] != nullptr);
+	//				hasChildren = hasChildren || (node.children[5] != nullptr);
+	//				hasChildren = hasChildren || (node.children[6] != nullptr);
+	//				hasChildren = hasChildren || (node.children[7] != nullptr);
+
+	//				if (hasChildren)
+	//				{
+	//					uint indx = octree.IncrementCounter();
+	//					octree[indx] = node;
+	//					hierarchy[totalNodes + generationalIdx] = indx + 1;
+	//				}
+	//			}
+	//		}
+
 	//		if (extends * 2.f >= fullSize)
-	//			break;
+	//		{
+	//			returned = true;
+	//		}
 
 	//		childIdx = generationalIdx;
 	//		totalNodes += nodesInGeneration;

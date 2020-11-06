@@ -7,7 +7,7 @@ public class Caster : MonoBehaviour
     public Voxelizer voxelizer;
     public Transform transformer;
     public bool draw;
-    public bool bruteForce;
+   public bool bruteForce;
     public uint G;
     public bool drawGthGenerationOnly;
 
@@ -23,6 +23,8 @@ public class Caster : MonoBehaviour
 
     private void OnDrawGizmos()
     {
+        //bruteForce = true;
+
         if (!drawGizmos)
             return;
 
@@ -32,6 +34,7 @@ public class Caster : MonoBehaviour
         if (voxelizer == null || voxelizer.data == null)
             return;
 
+        transformer = voxelizer.meshFilter.transform;
         Gizmos.matrix = transformer.localToWorldMatrix;
 
         voxelizer.DrawGizmos();
@@ -41,7 +44,7 @@ public class Caster : MonoBehaviour
         Vector3 origin = transform.position;
         Vector3 direction = transform.forward;
 
-        Gizmos.color = Color.white;
+        Gizmos.color = Color.red;
         Gizmos.DrawLine(origin, origin + (direction * 100000000));
 
         Gizmos.matrix = transformer.localToWorldMatrix;
@@ -53,7 +56,7 @@ public class Caster : MonoBehaviour
 
         Voxelizer.TreeNode root = voxelizer.data[voxelizer.root];
 
-        Gizmos.color = Color.red;
+        Gizmos.color = new Color(1, 0, 0, 0.5f);
 
         if (bruteForce)
         {

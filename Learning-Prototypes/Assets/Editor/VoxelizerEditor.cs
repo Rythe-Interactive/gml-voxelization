@@ -25,7 +25,8 @@ public class VoxelizerEditor : Editor
             vox.triangles = null;
             vox.dataCount = 0;
             vox.data = null;
-            
+            vox.model = null;
+            vox.OnValidate();
             SceneView.RepaintAll();
         }
 
