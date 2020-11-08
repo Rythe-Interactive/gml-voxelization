@@ -198,20 +198,20 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   meshFilter: {fileID: 1936533451}
   voxelizeShader: {fileID: 7200000, guid: c8408d2f494ff6a4ab96366bedb31ae0, type: 3}
-  resolution: 64
+  resolution: 16
   drawTriangles: 0
   drawNodes: 1
-  G: 0
-  drawGthGenerationOnly: 0
+  G: 3
+  drawGthGenerationOnly: 1
   N: 0
   drawNthChild: 0
   animate: 1
   model: {fileID: -2432090755550338912, guid: a66b0b170949289438d7af78d63b2528, type: 3}
-  dataCount: 11873
-  root: 3808
-  triangleCount: 968
-  generationCount: 5
-  drawGizmos: 0
+  dataCount: 717
+  root: 119
+  triangleCount: 0
+  generationCount: 4
+  drawGizmos: 1
 --- !u!1 &304716434
 GameObject:
   m_ObjectHideFlags: 0
@@ -243,11 +243,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   voxelizer: {fileID: 98183674}
   transformer: {fileID: 1936533449}
-  draw: 1
+  draw: 0
   bruteForce: 0
   G: 0
   drawGthGenerationOnly: 0
-  drawGizmos: 1
+  drawGizmos: 0
 --- !u!4 &304716436
 Transform:
   m_ObjectHideFlags: 0
@@ -256,7 +256,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 304716434}
   m_LocalRotation: {x: 0.102364354, y: -0.9233058, z: 0.15373957, w: 0.33673745}
-  m_LocalPosition: {x: 1.683, y: 1.395, z: 2.477}
+  m_LocalPosition: {x: 1.81, y: 1.44, z: 2.52}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -491,8 +491,8 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1936533448}
-  m_LocalRotation: {x: 0, y: 0.21929744, z: 0, w: 0.97565806}
-  m_LocalPosition: {x: -0.65942955, y: 0, z: -0.27712345}
+  m_LocalRotation: {x: 0, y: 0.6037174, z: 0, w: 0.7971985}
+  m_LocalPosition: {x: -0.21505833, y: 0, z: -0.66810155}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -505,7 +505,7 @@ MeshRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1936533448}
-  m_Enabled: 0
+  m_Enabled: 1
   m_CastShadows: 1
   m_ReceiveShadows: 1
   m_DynamicOccludee: 1

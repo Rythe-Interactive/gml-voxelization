@@ -84,7 +84,8 @@ void Voxelize(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
 	// Allows the shader to fast forward through everything without effecting anything else. Also allows the use of memory barriers.
 	bool returned = false;
 
-	if (idx >= (resolution * resolution * resolution)) // if the index is outside the bounds escape.
+    uint nodesInGeneration = resolution * resolution * resolution;
+    if (idx >= nodesInGeneration) // if the index is outside the bounds escape.
 		returned = true;
 
 	uint3 idx3 = IdxToIdx3(idx, resolution);
@@ -116,9 +117,8 @@ void Voxelize(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
 		}
 	}
 
-	const uint maxGenerationCount = uint((log((float)triangleCount) / log(8.f)) * 3.f); // Technically it should be infinity but we don't want that, so we call it 3x the minimal generation count.
+    const uint maxGenerationCount = uint(log((float) nodesInGeneration) / log(8.f)) + 1; // Technically it should be infinity but we don't want that, so we call it 3x the minimal generation count.
 
-	uint nodesInGeneration = resolution * resolution * resolution;
 	uint generationResolution = resolution;
 	uint childrenResolution = resolution;
 	uint totalNodes = 0;
@@ -144,20 +144,19 @@ void Voxelize(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
 					node.triangles[1] = triangleIndices[1];
 					node.triangles[2] = triangleIndices[2];
 					node.triangles[3] = triangleIndices[3];
-				}
-				else // Set children only for any branch generation.
-				{
-					childIdx3 = IdxToIdx3(childIdx, childrenResolution);
-					node.children[0] = hierarchy[childTotal + Idx3ToIdx(childIdx3, childrenResolution)]; // 0, 0, 0
-					node.children[1] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(1, 0, 0), childrenResolution)]; // 1, 0, 0
-					node.children[2] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(1, 0, 1), childrenResolution)]; // 1, 0, 1
-					node.children[3] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(0, 0, 1), childrenResolution)]; // 0, 0, 1
-					node.children[4] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(0, 1, 0), childrenResolution)]; // 0, 1, 0
-					node.children[5] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(1, 1, 0), childrenResolution)]; // 1, 1, 0
-					node.children[6] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(1, 1, 1), childrenResolution)]; // 1, 1, 1
-					node.children[7] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(0, 1, 1), childrenResolution)]; // 0, 1, 1
-				}
-			}
+                }
+                else // Set children only for any branch generation.
+                {
+                    node.children[0] = hierarchy[childTotal + childIdx]; // 0, 0, 0
+                    node.children[1] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(1, 0, 0), childrenResolution)]; // 1, 0, 0
+                    node.children[2] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(1, 0, 1), childrenResolution)]; // 1, 0, 1
+                    node.children[3] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(0, 0, 1), childrenResolution)]; // 0, 0, 1
+                    node.children[4] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(0, 1, 0), childrenResolution)]; // 0, 1, 0
+                    node.children[5] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(1, 1, 0), childrenResolution)]; // 1, 1, 0
+                    node.children[6] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(1, 1, 1), childrenResolution)]; // 1, 1, 1
+                    node.children[7] = hierarchy[childTotal + Idx3ToIdx(childIdx3 + uint3(0, 1, 1), childrenResolution)]; // 0, 1, 1
+                }
+            }
 
 			// Filter out whether we are the 1st child of our parent or not.
 			uint3 subIdx3;
@@ -168,8 +167,6 @@ void Voxelize(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
 			{
 				returned = true;
 			}
-
-			uint3 parentIdx3 = floor(generationIdx3 / 2.f);
 
 			if (!returned)
 			{
@@ -183,18 +180,18 @@ void Voxelize(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
 					}
 				}
 				else
-				{
-					bool hasChildren = false;
-					hasChildren = hasChildren || (node.children[0] != nullptr);
-					hasChildren = hasChildren || (node.children[1] != nullptr);
-					hasChildren = hasChildren || (node.children[2] != nullptr);
-					hasChildren = hasChildren || (node.children[3] != nullptr);
-					hasChildren = hasChildren || (node.children[4] != nullptr);
-					hasChildren = hasChildren || (node.children[5] != nullptr);
-					hasChildren = hasChildren || (node.children[6] != nullptr);
-					hasChildren = hasChildren || (node.children[7] != nullptr);
+                {
+                    bool hasChildren = false;
+                    hasChildren = hasChildren || (node.children[0] != nullptr);
+                    hasChildren = hasChildren || (node.children[1] != nullptr);
+                    hasChildren = hasChildren || (node.children[2] != nullptr);
+                    hasChildren = hasChildren || (node.children[3] != nullptr);
+                    hasChildren = hasChildren || (node.children[4] != nullptr);
+                    hasChildren = hasChildren || (node.children[5] != nullptr);
+                    hasChildren = hasChildren || (node.children[6] != nullptr);
+                    hasChildren = hasChildren || (node.children[7] != nullptr);
 
-					if (hasChildren)
+                    if (hasChildren)
 					{
 						uint indx = octree.IncrementCounter();
 						octree[indx] = node;
@@ -214,9 +211,9 @@ void Voxelize(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
 			nodesInGeneration = nodesInGeneration / 8;
 			childrenResolution = generationResolution;
 			generationResolution = generationResolution / 2;
-			generationalIdx = Idx3ToIdx(parentIdx3, generationResolution);
-			childIdx3 = generationIdx3;
-			generationIdx3 = parentIdx3;
+            childIdx3 = generationIdx3;
+            generationIdx3 = floor(generationIdx3 / 2.f);
+            generationalIdx = Idx3ToIdx(generationIdx3, generationResolution);
 			extends *= 2.f;
 			origin = (float3(idx3.x, idx3.y, idx3.z) * float3(boundSize, boundSize, boundSize)) + float3(extends, extends, extends) - (fullSize * 0.5f);
 		}
