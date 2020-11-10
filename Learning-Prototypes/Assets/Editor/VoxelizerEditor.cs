@@ -10,15 +10,24 @@ public class VoxelizerEditor : Editor
     {
         base.OnInspectorGUI();
 
+        Voxelizer vox = (target as Voxelizer);
+
+        uint newG = (uint)Mathf.RoundToInt(EditorGUILayout.Slider("G", (float)vox.G, 0, (float)vox.generationCount));
+
+        if(newG != vox.G)
+        {
+            vox.G = newG;
+            SceneView.RepaintAll();
+        }
+
         if (GUILayout.Button("Voxelize"))
         {
-            (target as Voxelizer).Voxelize();
+            vox.Voxelize();
             SceneView.RepaintAll();
         }
 
         if (GUILayout.Button("Clear"))
         {
-            Voxelizer vox = (target as Voxelizer);
             vox.ClearLog();
             vox.generationCount = 0;
             vox.triangleCount = 0;

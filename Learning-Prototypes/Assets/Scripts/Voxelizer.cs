@@ -13,14 +13,15 @@ public class Voxelizer : MonoBehaviour
     public MeshFilter meshFilter;
     public ComputeShader voxelizeShader;
     public uint resolution;
-    public bool drawNodes;
-    public uint G;
-    public bool drawGthGenerationOnly;
+    public bool drawAllNodes;
     [Range(0, 7)]
     public uint N;
     public bool drawNthChild;
     public bool drawVoxelByVoxel;
     public bool animate;
+    [HideInInspector]
+    public uint G;
+    public bool drawGthGenerationOnly;
 
     public struct tripoly
     {
@@ -42,11 +43,19 @@ public class Voxelizer : MonoBehaviour
             }
         }
 
+        public Vector3 position
+        {
+            get
+            {
+                return (v0 + v1 + v2) / 3f;
+            }
+        }
+
         public Vector3 normal
         {
             get
             {
-                return Vector3.Cross(v0, v1).normalized;
+                return Vector3.Cross(v1 - v0, v2 - v0).normalized;
             }
         }
 
@@ -123,9 +132,9 @@ public class Voxelizer : MonoBehaviour
     public float leafSize = 0;
 
     [HideInInspector]
-    public Dictionary<float, int> generations;
+    public List<System.Tuple<int, int>> generations;
     [HideInInspector]
-    public Dictionary<int, int> resolutions;
+    public List<int> resolutions;
 
     [HideInInspector]
     public bool drawGizmos;
@@ -196,7 +205,7 @@ public class Voxelizer : MonoBehaviour
 
     private void Update()
     {
-        //Voxelize();
+        Voxelize();
     }
 
     public void Voxelize()
@@ -215,6 +224,9 @@ public class Voxelizer : MonoBehaviour
 
         if (model == null)
             return;
+
+        generations = new List<System.Tuple<int, int>>();
+        resolutions = new List<int>();
 
         #region vertex shader
         if (triangleCount < model.triangles.Length / 3)
@@ -345,11 +357,20 @@ public class Voxelizer : MonoBehaviour
         int res = (int)resolution;
         counter[0] = 0;
         int childstart = 0;
+        int prevGenStart = 0;
+        int[] genStart = { 0 };
         for (int i = 0; i < generationCount; i++)
         {
             childstart = (int)counter[0];
             ComputeBuffer.CopyCount(hierarchyBuffer, countBuffer, 0);
             countBuffer.GetData(counter);
+
+            prevGenStart = genStart[0];
+            ComputeBuffer.CopyCount(octree, countBuffer, 0);
+            countBuffer.GetData(genStart);
+
+            generations.Add(System.Tuple.Create(prevGenStart, genStart[0]));
+            resolutions.Add(res);
 
             res /= 2;
             voxelSize *= 2;
@@ -369,8 +390,11 @@ public class Voxelizer : MonoBehaviour
             }
         }
 
+        prevGenStart = genStart[0];
         ComputeBuffer.CopyCount(octree, countBuffer, 0);
         countBuffer.GetData(counter);
+        generations.Add(System.Tuple.Create(prevGenStart, (int)counter[0]));
+        resolutions.Add(res);
 
         if (data == null || data.Length < counter[0])
         {
@@ -380,7 +404,6 @@ public class Voxelizer : MonoBehaviour
         octree.GetData(data, 0, 0, (int)counter[0]);
 
         dataCount = (int)counter[0];
-        Debug.Log(dataCount + " nodes generated");
         root = (uint)dataCount - 1;
         #endregion
     }
@@ -587,11 +610,20 @@ public class Voxelizer : MonoBehaviour
             Gizmos.color = new Color(1, 1, 1, 0.1f);
             Gizmos.DrawWireCube(Vector3.zero, new Vector3(maxExtend, maxExtend, maxExtend) * 2f);
 
-            for (int i = 0; i < dataCount; i++)
+            if (drawAllNodes)
             {
                 Gizmos.color = new Color(0, 1, 0, 0.1f);
 
-                if (drawNodes)
+                for (int i = 0; i < dataCount; i++)
+                {
+                    Gizmos.DrawWireCube(data[i].origin, new Vector3(data[i].extends, data[i].extends, data[i].extends) * 2f);
+                }
+            }
+
+            if (drawGthGenerationOnly)
+            {
+                Gizmos.color = new Color(1, 1, 0, 0.1f);
+                for (int i = generations[(int)G].Item1; i < generations[(int)G].Item2; i++)
                 {
                     Gizmos.DrawWireCube(data[i].origin, new Vector3(data[i].extends, data[i].extends, data[i].extends) * 2f);
                 }

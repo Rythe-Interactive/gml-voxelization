@@ -44,9 +44,9 @@ void ProcessMesh(uint3 id : SV_DispatchThreadID, uint3 groupId : SV_GroupID)
 	}
 	else
 	{
-		tri.v[0] = mul(modelmatrix, float4(v0, 1)).xyz;
-		tri.v[1] = mul(modelmatrix, float4(v1, 1)).xyz;
-		tri.v[2] = mul(modelmatrix, float4(v2, 1)).xyz;
+		tri.v[0] = v0;
+		tri.v[1] = v1;
+		tri.v[2] = v2;
 	}
 
 	triangles[id.x] = tri;
