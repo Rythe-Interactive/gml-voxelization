@@ -14,6 +14,11 @@ public class Caster : MonoBehaviour
     [HideInInspector]
     public bool drawGizmos;
 
+    public Color rayColor;
+    public Color bounceRayColor;
+    public Color octreeColor;
+    public Color triangleColor;
+    public Color triangleHitColor;
     uint closesttriangle;
     float smallestDist;
 
@@ -62,25 +67,28 @@ public class Caster : MonoBehaviour
         if (rayCount != dirs.Count)
             GetDirs();
 
+        //Stopwatch stopwatch = new Stopwatch();
+        //stopwatch.Start();
         for (int i = 0; i < rayCount; i++)
         {
             Vector3 direction = transformer.worldToLocalMatrix * transform.localToWorldMatrix * new Vector4(dirs[i].x, dirs[i].y, dirs[i].z, 0);
             CastRay(new Ray(origin, direction));
         }
+        //stopwatch.Stop();
+        //Debug.Log("casting took " + stopwatch.Elapsed.TotalMilliseconds + "ms");
     }
 
     void CastRay(Ray ray)
     {
         Voxelizer.TreeNode root = voxelizer.data[voxelizer.root];
 
-        Gizmos.color = new Color(1, 0, 0, 0.1f);
         closesttriangle = 0;
         smallestDist = 1000000000000;
         TraverseTree(root, ray);
 
         if (closesttriangle != 0)
         {
-            Gizmos.color = Color.green;
+            Gizmos.color = triangleHitColor;
             var verts = voxelizer.triangles[closesttriangle - 1].vertices;
             for (int j = 0; j < verts.Length; j++)
                 Gizmos.DrawLine(verts[j], verts[(j + 1) % verts.Length]);
@@ -92,11 +100,11 @@ public class Caster : MonoBehaviour
                 normal = -normal;
 
             Vector3 newRayDir = Vector3.Reflect(ray.direction, normal);
-            Gizmos.color = new Color(0, 1, 1, 0.1f);
+            Gizmos.color = bounceRayColor;
             Gizmos.DrawLine(position, position + (newRayDir * 1000000000000));
         }
 
-        Gizmos.color = new Color(1, 1, 1, 0.1f);
+        Gizmos.color = rayColor;
         if (drawRays)
             Gizmos.DrawLine(ray.origin, ray.origin + (ray.direction * smallestDist));
     }
@@ -107,10 +115,11 @@ public class Caster : MonoBehaviour
         Bounds box = new Bounds(node.origin, extends * 2f);
         if (box.IntersectRay(ray))
         {
-            Gizmos.color = new Color(1, 0, 0, 0.5f);
-
             if (drawBoxes)
+            {
+                Gizmos.color = octreeColor;
                 Gizmos.DrawWireCube(node.origin, extends * 2f);
+            }
 
             if (node.extends * 2f > voxelizer.leafSize)
             {
@@ -121,7 +130,7 @@ public class Caster : MonoBehaviour
             }
             else if (drawRays)
             {
-                Gizmos.color = new Color(1, 0, 1, 1);
+                Gizmos.color = triangleColor;
 
                 var children = node.children;
                 foreach (var tridx in children)
@@ -138,8 +147,8 @@ public class Caster : MonoBehaviour
                                 closesttriangle = tridx;
                             }
 
-                            for (int j = 0; j < verts.Length; j++)
-                                Gizmos.DrawLine(verts[j], verts[(j + 1) % verts.Length]);
+                            //for (int j = 0; j < verts.Length; j++)
+                            //    Gizmos.DrawLine(verts[j], verts[(j + 1) % verts.Length]);
                         }
                     }
                 }

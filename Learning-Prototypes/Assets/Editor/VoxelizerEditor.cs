@@ -35,6 +35,7 @@ public class VoxelizerEditor : Editor
             vox.dataCount = 0;
             vox.data = null;
             vox.model = null;
+            vox.originalvertices = null;
             vox.OnValidate();
             SceneView.RepaintAll();
         }

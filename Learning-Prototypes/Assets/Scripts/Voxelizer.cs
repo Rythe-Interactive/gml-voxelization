@@ -194,7 +194,8 @@ public class Voxelizer : MonoBehaviour
     ComputeBuffer countBuffer;
 
     Vector3[] vertices;
-    Vector3[] originalvertices;
+    [HideInInspector]
+    public Vector3[] originalvertices;
 
     ComputeBuffer indexBuffer;
     int indexBufferSize = 0;
@@ -278,7 +279,8 @@ public class Voxelizer : MonoBehaviour
 
         voxelizeShader.Dispatch(processMeshKernel, Mathf.RoundToInt(triangleCount / 1024f), 1, 1);
         #endregion
-
+        //Stopwatch stopwatch = new Stopwatch();
+        //stopwatch.Start();
         #region voxelize
         if (vertices == null || vertices.Length < vertexBufferSize)
             vertices = new Vector3[vertexBufferSize];
@@ -406,6 +408,8 @@ public class Voxelizer : MonoBehaviour
         dataCount = (int)counter[0];
         root = (uint)dataCount - 1;
         #endregion
+        //stopwatch.Stop();
+        //Debug.Log("voxelize took " + stopwatch.Elapsed.TotalMilliseconds + "ms");
     }
 
     //public void VoxelizeOld()
