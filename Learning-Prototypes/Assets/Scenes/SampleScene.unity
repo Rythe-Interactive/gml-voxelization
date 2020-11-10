@@ -197,20 +197,21 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   meshFilter: {fileID: 1936533451}
-  voxelizeShader: {fileID: 7200000, guid: c8408d2f494ff6a4ab96366bedb31ae0, type: 3}
+  voxelizeShader: {fileID: 7200000, guid: 5d672ad74e966f540a39a4c0686b8ee3, type: 3}
   resolution: 16
-  drawTriangles: 0
-  drawNodes: 1
-  G: 3
+  drawNodes: 0
+  G: 0
   drawGthGenerationOnly: 1
   N: 0
   drawNthChild: 0
+  drawVoxelByVoxel: 1
   animate: 1
   model: {fileID: -2432090755550338912, guid: a66b0b170949289438d7af78d63b2528, type: 3}
-  dataCount: 717
-  root: 119
+  dataCount: 0
+  root: 796
   triangleCount: 0
-  generationCount: 4
+  generationCount: 0
+  leafSize: 0.1708985
   drawGizmos: 1
 --- !u!1 &304716434
 GameObject:
@@ -243,7 +244,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   voxelizer: {fileID: 98183674}
   transformer: {fileID: 1936533449}
-  draw: 0
+  draw: 1
   bruteForce: 0
   G: 0
   drawGthGenerationOnly: 0
