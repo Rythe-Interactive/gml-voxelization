@@ -159,7 +159,7 @@ int point_triangle_intersection(float3 p, tripoly t)
 /* intersects or does not intersect the cube. */
 /**********************************************/
 
-bool t_c_intersection(tripoly t, float3 origin, float extends)
+bool t_c_intersection(float3 origin, float extends, tripoly t)
 {
 	t.v[0] -= origin;
 	t.v[1] -= origin;

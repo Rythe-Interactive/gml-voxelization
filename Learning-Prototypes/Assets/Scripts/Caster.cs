@@ -7,7 +7,7 @@ public class Caster : MonoBehaviour
     public Voxelizer voxelizer;
     public Transform transformer;
     public bool draw;
-   public bool bruteForce;
+    public bool bruteForce;
     public uint G;
     public bool drawGthGenerationOnly;
 
@@ -76,25 +76,14 @@ public class Caster : MonoBehaviour
             if (!drawGthGenerationOnly || G == voxelizer.generations[node.extends])
                 Gizmos.DrawWireCube(node.origin, extends * 2f);
 
-            if (!bruteForce)
-            {
-                if (node.child0 != 0)
-                    TraverseTree(voxelizer.data[node.child0 - 1], ray);
-                if (node.child1 != 0)
-                    TraverseTree(voxelizer.data[node.child1 - 1], ray);
-                if (node.child2 != 0)
-                    TraverseTree(voxelizer.data[node.child2 - 1], ray);
-                if (node.child3 != 0)
-                    TraverseTree(voxelizer.data[node.child3 - 1], ray);
-                if (node.child4 != 0)
-                    TraverseTree(voxelizer.data[node.child4 - 1], ray);
-                if (node.child5 != 0)
-                    TraverseTree(voxelizer.data[node.child5 - 1], ray);
-                if (node.child6 != 0)
-                    TraverseTree(voxelizer.data[node.child6 - 1], ray);
-                if (node.child7 != 0)
-                    TraverseTree(voxelizer.data[node.child7 - 1], ray);
-            }
+            if (node.extends * 2f > voxelizer.leafSize)
+                if (!bruteForce)
+                {
+                    var children = node.children;
+                    foreach (var childIdx in children)
+                        if (childIdx != 0)
+                            TraverseTree(voxelizer.data[childIdx - 1], ray);
+                }
         }
     }
 }

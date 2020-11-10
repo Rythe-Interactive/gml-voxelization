@@ -5,8 +5,6 @@
 
 typedef uint ptr;
 #define nullptr 0
-#define FLT_MAX 3.402823e+38
-#define FLT_MIN 1.175494e-38
 
 struct TreeNode
 {
@@ -100,7 +98,7 @@ void Generation0(uint3 id : SV_DispatchThreadID)
 
 	for (uint i = 0; i < triangleCount; i++)
 	{
-		if (t_c_intersection(triangles[i], origin, extends))
+		if (t_c_intersection(origin, extends, triangles[i]))
 		{
 			trianglesFound = true;
 			triangleIndices[lastIdx] = i + 1;
@@ -151,13 +149,13 @@ void GenerationN(uint3 id : SV_DispatchThreadID)
 	// get other children indices by adding 1 in each dimension to child0
 	uint3 child0Idx3 = idx3 * 2;
 	uint child0Idx = childGenerationStart + Idx3ToIdx(child0Idx3, childResolution);
-	uint child1Idx = childGenerationStart + Idx3ToIdx(child0Idx3 + float3(1, 0, 0), childResolution);
-	uint child2Idx = childGenerationStart + Idx3ToIdx(child0Idx3 + float3(1, 0, 1), childResolution);
-	uint child3Idx = childGenerationStart + Idx3ToIdx(child0Idx3 + float3(0, 0, 1), childResolution);
-	uint child4Idx = childGenerationStart + Idx3ToIdx(child0Idx3 + float3(0, 1, 0), childResolution);
-	uint child5Idx = childGenerationStart + Idx3ToIdx(child0Idx3 + float3(1, 1, 0), childResolution);
-	uint child6Idx = childGenerationStart + Idx3ToIdx(child0Idx3 + float3(1, 1, 1), childResolution);
-	uint child7Idx = childGenerationStart + Idx3ToIdx(child0Idx3 + float3(0, 1, 1), childResolution);
+	uint child1Idx = childGenerationStart + Idx3ToIdx(child0Idx3 + uint3(1, 0, 0), childResolution);
+	uint child2Idx = childGenerationStart + Idx3ToIdx(child0Idx3 + uint3(1, 0, 1), childResolution);
+	uint child3Idx = childGenerationStart + Idx3ToIdx(child0Idx3 + uint3(0, 0, 1), childResolution);
+	uint child4Idx = childGenerationStart + Idx3ToIdx(child0Idx3 + uint3(0, 1, 0), childResolution);
+	uint child5Idx = childGenerationStart + Idx3ToIdx(child0Idx3 + uint3(1, 1, 0), childResolution);
+	uint child6Idx = childGenerationStart + Idx3ToIdx(child0Idx3 + uint3(1, 1, 1), childResolution);
+	uint child7Idx = childGenerationStart + Idx3ToIdx(child0Idx3 + uint3(0, 1, 1), childResolution);
 
 	// fetch children from hierarchy
 	node.children[0] = hierarchy[child0Idx];

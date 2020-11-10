@@ -316,12 +316,14 @@ public class Voxelizer : MonoBehaviour
 
         int generation0Kernel = voxelizeShader.FindKernel("Generation0");
         voxelizeShader.SetBuffer(generation0Kernel, "octree", octree);
-        voxelizeShader.SetBuffer(generation0Kernel, "triangles", triangleBuffer);
         voxelizeShader.SetBuffer(generation0Kernel, "hierarchy", hierarchyBuffer);
         voxelizeShader.SetInt("generationStart", 0);
         voxelizeShader.SetInt("resolution", (int)resolution);
         voxelizeShader.SetFloat("voxelSize", voxelSize);
         voxelizeShader.SetFloat("bounds", maxExtend);
+
+        triangleBuffer.GetData(triangles);
+        voxelizeShader.SetBuffer(generation0Kernel, "triangles", triangleBuffer);
 
         uint threadCount;
         uint temp;
@@ -666,6 +668,7 @@ public class Voxelizer : MonoBehaviour
     }
 
     List<TreeNode> voxelsToDraw;
+    List<tripoly> trianglesToDraw;
     bool coroutineRunning = false;
 
     void DrawVoxelByVoxel()
@@ -673,8 +676,20 @@ public class Voxelizer : MonoBehaviour
         if (!coroutineRunning)
             StartCoroutine(RootCoroutine());
 
+        Gizmos.color = new Color(1, 0, 1, 1);
+
         for (int i = 0; i < voxelsToDraw.Count; i++)
             Gizmos.DrawWireCube(voxelsToDraw[i].origin, new Vector3(voxelsToDraw[i].extends, voxelsToDraw[i].extends, voxelsToDraw[i].extends) * 2f);
+
+        Gizmos.color = new Color(1, 0, 0, 1);
+
+        for (int i = 0; i < trianglesToDraw.Count; i++)
+        {
+            var verts = trianglesToDraw[i].vertices;
+            for (int j = 0; j < verts.Length; j++)
+                Gizmos.DrawLine(verts[j], verts[(j + 1) % verts.Length]);
+        }
+
     }
 
     IEnumerator RootCoroutine()
@@ -683,6 +698,7 @@ public class Voxelizer : MonoBehaviour
         while (true)
         {
             voxelsToDraw = new List<TreeNode>();
+            trianglesToDraw = new List<tripoly>();
             yield return StartCoroutine(DrawVoxelByVoxelCoroutine(data[root]));
         }
     }
@@ -690,17 +706,35 @@ public class Voxelizer : MonoBehaviour
     IEnumerator DrawVoxelByVoxelCoroutine(TreeNode node)
     {
         voxelsToDraw.Add(node);
-        yield return new WaitForSeconds(1f);
 
-        if (node.extends > leafSize)
+        if (node.extends * 2f > leafSize)
+        {
+            yield return new WaitForSeconds(0.5f);
+            var children = node.children;
+
+            for (int i = 0; i < 8; i++)
+            {
+                if (children[i] != 0)
+                    yield return StartCoroutine(DrawVoxelByVoxelCoroutine(data[children[i] - 1]));
+            }
+        }
+        else
         {
             var children = node.children;
 
             for (int i = 0; i < 8; i++)
             {
                 if (children[i] != 0)
-                    yield return StartCoroutine(DrawVoxelByVoxelCoroutine(data[children[i]]));
+                {
+                    uint tridx = children[i] - 1;
+                    if (tridx < 0 || tridx >= triangles.Length)
+                        Debug.Log("whut... " + tridx);
+
+                    trianglesToDraw.Add(triangles[tridx]);
+                }
             }
+            yield return new WaitForSeconds(0.5f);
+            trianglesToDraw.Clear();
         }
 
         voxelsToDraw.RemoveAt(voxelsToDraw.Count - 1);

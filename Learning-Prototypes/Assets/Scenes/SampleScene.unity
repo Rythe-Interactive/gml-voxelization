@@ -204,15 +204,15 @@ MonoBehaviour:
   drawGthGenerationOnly: 1
   N: 0
   drawNthChild: 0
-  drawVoxelByVoxel: 1
+  drawVoxelByVoxel: 0
   animate: 1
   model: {fileID: -2432090755550338912, guid: a66b0b170949289438d7af78d63b2528, type: 3}
   dataCount: 0
-  root: 796
+  root: 2614
   triangleCount: 0
   generationCount: 0
   leafSize: 0.1708985
-  drawGizmos: 1
+  drawGizmos: 0
 --- !u!1 &304716434
 GameObject:
   m_ObjectHideFlags: 0
@@ -493,7 +493,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1936533448}
   m_LocalRotation: {x: 0, y: 0.6037174, z: 0, w: 0.7971985}
-  m_LocalPosition: {x: -0.21505833, y: 0, z: -0.66810155}
+  m_LocalPosition: {x: -0.711604, y: -0.07936907, z: -0.85943234}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children: []
   m_Father: {fileID: 0}
@@ -506,7 +506,7 @@ MeshRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1936533448}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 1
   m_ReceiveShadows: 1
   m_DynamicOccludee: 1
